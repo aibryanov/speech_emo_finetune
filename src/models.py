@@ -25,9 +25,18 @@ class SpeechEmotionModel(nn.Module):
 
     def forward(self, input_values: torch.Tensor, attention_mask: torch.Tensor | None = None):
         out = self.backbone(input_values=input_values, attention_mask=attention_mask)
-        hidden = out.last_hidden_state  # (B, T, H)
-        pooled = self._mean_pool(hidden, attention_mask if attention_mask is not None else torch.ones(hidden.shape[:2], device=hidden.device))
-        logits = self.classifier(pooled)
+        hidden = out.last_hidden_state  # (B, T_out, H)
+
+        # Downsample waveform-resolution mask to backbone output resolution
+        T_out = hidden.shape[1]
+        if attention_mask is not None and attention_mask.shape[1] != T_out:
+            idx = (torch.arange(T_out, device=hidden.device).float()
+                   * (attention_mask.shape[1] / T_out)).long().clamp(max=attention_mask.shape[1] - 1)
+            out_mask = attention_mask[:, idx]
+        else:
+            out_mask = attention_mask if attention_mask is not None else torch.ones(hidden.shape[:2], device=hidden.device, dtype=torch.long)
+
+        logits = self.classifier(self._mean_pool(hidden, out_mask))
         return logits
 
 
@@ -70,12 +79,13 @@ class LSTMSpeechEmotionModel(nn.Module):
         if attention_mask is None:
             attention_mask = torch.ones(hidden.shape[:2], device=hidden.device, dtype=torch.long)
 
-        # attention_mask is at waveform resolution; LSTM operates on backbone output resolution
-        # backbone downsamples by ~320x — derive output mask from backbone output shape
         T_out = lstm_out.shape[1]
-        T_in = input_values.shape[1]
-        scale = T_in / T_out
-        out_mask = (attention_mask[:, :: int(scale)][:, :T_out] > 0).long()
+        if attention_mask.shape[1] != T_out:
+            idx = (torch.arange(T_out, device=lstm_out.device).float()
+                   * (attention_mask.shape[1] / T_out)).long().clamp(max=attention_mask.shape[1] - 1)
+            out_mask = attention_mask[:, idx]
+        else:
+            out_mask = attention_mask
 
         pooled = self._mean_pool(lstm_out, out_mask)
         logits = self.classifier(pooled)
