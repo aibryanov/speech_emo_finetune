@@ -1,0 +1,8 @@
+model_name: xbgoose/wavlm-base-speech-emotion-recognition-russian-dusha-finetuned
+fine_tune_strategy: full
+batch_size: 8
+grad_accum_steps: 4
+lr: 3.0e-5
+epochs: 10
+run_name: wavlm_base_full
+output_dir: outputs/wavlm_base_full

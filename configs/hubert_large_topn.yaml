@@ -1,0 +1,9 @@
+model_name: xbgoose/hubert-large-speech-emotion-recognition-russian-dusha-finetuned
+fine_tune_strategy: top_n
+top_n_layers: 4
+batch_size: 4
+grad_accum_steps: 8
+lr: 5.0e-5
+epochs: 10
+run_name: hubert_large_topn
+output_dir: outputs/hubert_large_topn
