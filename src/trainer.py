@@ -11,7 +11,7 @@ import torch.nn as nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from transformers import get_linear_schedule_with_warmup
 
 from src.config import ExperimentConfig
@@ -103,7 +103,6 @@ class Trainer:
 
     # ------------------------------------------------------------------
     def _log(self, record: Dict):
-        print(json.dumps(record, indent=None))
         self.metrics_log.append(record)
         with open(self.output_dir / "metrics.jsonl", "a") as f:
             f.write(json.dumps(record) + "\n")
@@ -118,6 +117,13 @@ class Trainer:
     # ------------------------------------------------------------------
     def fit(self):
         best_ckpt = self.output_dir / "best_model.pt"
+
+        header = f"{'Epoch':>5}  {'Loss':>7}  {'Acc':>6}  {'WAcc':>6}  {'F1mac':>6}  {'F1w':>6}  {'Time':>6}  {'Best':>4}"
+        sep = "-" * len(header)
+        print(f"\nRun: {self.config.run_name}  |  strategy: {self.config.fine_tune_strategy}  |  model: {self.config.model_name}", flush=True)
+        print(sep, flush=True)
+        print(header, flush=True)
+        print(sep, flush=True)
 
         for epoch in range(self.config.epochs):
             t0 = time.time()
@@ -136,13 +142,23 @@ class Trainer:
             }
             self._log(record)
 
-            if dev_metrics["f1_weighted"] > self.best_metric:
+            is_best = dev_metrics["f1_weighted"] > self.best_metric
+            if is_best:
                 self.best_metric = dev_metrics["f1_weighted"]
                 self.save_checkpoint(best_ckpt)
-                print(f"  -> New best (f1_weighted={self.best_metric:.4f}), saved checkpoint.")
+
+            print(
+                f"{epoch+1:>5}  {train_loss:>7.4f}  "
+                f"{dev_metrics['accuracy']:>6.4f}  {dev_metrics['weighted_accuracy']:>6.4f}  "
+                f"{dev_metrics['f1_macro']:>6.4f}  {dev_metrics['f1_weighted']:>6.4f}  "
+                f"{elapsed:>5.0f}s  {'*' if is_best else ''}",
+                flush=True,
+            )
+
+        print(sep, flush=True)
 
         # final evaluation on test set using best checkpoint
-        print("\nLoading best checkpoint for test evaluation...")
+        print(f"\nLoading best checkpoint (f1_weighted={self.best_metric:.4f})...", flush=True)
         self.load_checkpoint(best_ckpt)
         test_metrics = self.eval_epoch(self.test_loader, "test")
 
@@ -156,13 +172,14 @@ class Trainer:
             "confusion_matrix": test_metrics["confusion_matrix"],
         }
         self._log(test_record)
-        print("\n=== Test Results ===")
-        print(f"  accuracy:          {test_record['accuracy']:.4f}")
-        print(f"  weighted_accuracy: {test_record['weighted_accuracy']:.4f}")
-        print(f"  f1_macro:          {test_record['f1_macro']:.4f}")
-        print(f"  f1_weighted:       {test_record['f1_weighted']:.4f}")
-        print("\nPer-class metrics:")
+
+        print("\n=== Test Results ===", flush=True)
+        print(f"  accuracy          {test_record['accuracy']:.4f}", flush=True)
+        print(f"  weighted_accuracy {test_record['weighted_accuracy']:.4f}", flush=True)
+        print(f"  f1_macro          {test_record['f1_macro']:.4f}", flush=True)
+        print(f"  f1_weighted       {test_record['f1_weighted']:.4f}", flush=True)
+        print(f"\n{'Class':12s}  {'P':>6}  {'R':>6}  {'F1':>6}  {'n':>5}", flush=True)
         for cls, vals in test_metrics["per_class"].items():
-            print(f"  {cls:12s}  P={vals['precision']:.3f}  R={vals['recall']:.3f}  F1={vals['f1']:.3f}  n={int(vals['support'])}")
+            print(f"  {cls:12s}  {vals['precision']:6.3f}  {vals['recall']:6.3f}  {vals['f1']:6.3f}  {int(vals['support']):5d}", flush=True)
 
         return test_metrics
