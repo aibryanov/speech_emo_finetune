@@ -1,4 +1,5 @@
 model_name: xbgoose/hubert-large-speech-emotion-recognition-russian-dusha-finetuned
+processor_name: facebook/hubert-large-ls960-ft
 fine_tune_strategy: lstm
 lstm_hidden: 256
 lstm_layers: 2

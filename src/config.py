@@ -13,6 +13,7 @@ CONFIGS_DIR = Path(__file__).parent.parent / "configs"
 class ExperimentConfig:
     # --- model ---
     model_name: str = "microsoft/wavlm-base"
+    processor_name: Optional[str] = None  # if None, falls back to model_name
     fine_tune_strategy: str = "head_only"  # head_only | lora | top_n | full | lstm
 
     # --- LoRA ---

@@ -1,4 +1,5 @@
 model_name: xbgoose/wavlm-base-speech-emotion-recognition-russian-dusha-finetuned
+processor_name: microsoft/wavlm-base
 fine_tune_strategy: lora
 lora_rank: 8
 lora_alpha: 16

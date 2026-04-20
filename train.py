@@ -46,7 +46,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device:   {device}", flush=True)
 
-    processor = AutoFeatureExtractor.from_pretrained(config.model_name)
+    processor = AutoFeatureExtractor.from_pretrained(config.processor_name or config.model_name)
     train_loader, dev_loader, test_loader = get_dataloaders(config, processor)
 
     print(f"Train: {len(train_loader.dataset)} | Dev: {len(dev_loader.dataset)} | Test: {len(test_loader.dataset)}", flush=True)

@@ -1,4 +1,5 @@
 model_name: KELONMYOSA/wav2vec2-xls-r-300m-emotion-ru
+processor_name: facebook/wav2vec2-xls-r-300m
 fine_tune_strategy: lora
 lora_rank: 8
 lora_alpha: 16
