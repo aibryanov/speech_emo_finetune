@@ -1,0 +1,15 @@
+fine_tune_strategy: lstm_features
+feature_type: combined   # mfcc | mfcc_delta | logmel | combined
+n_mfcc: 40
+n_mels: 80
+n_fft: 400
+hop_length: 160
+lstm_hidden: 256
+lstm_layers: 2
+lstm_dropout: 0.1
+batch_size: 64
+grad_accum_steps: 1
+lr: 1.0e-3
+epochs: 30
+run_name: lstm_features
+output_dir: outputs/lstm_features

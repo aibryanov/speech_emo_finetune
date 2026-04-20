@@ -10,10 +10,9 @@ import random
 
 import numpy as np
 import torch
-from transformers import AutoFeatureExtractor
 
 from src.config import load_config
-from src.dataset import get_dataloaders
+from src.dataset import get_dataloaders, get_feature_dataloaders
 from src.models import build_model
 from src.trainer import Trainer
 
@@ -46,8 +45,12 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device:   {device}", flush=True)
 
-    processor = AutoFeatureExtractor.from_pretrained(config.processor_name or config.model_name)
-    train_loader, dev_loader, test_loader = get_dataloaders(config, processor)
+    if config.fine_tune_strategy == "lstm_features":
+        train_loader, dev_loader, test_loader = get_feature_dataloaders(config)
+    else:
+        from transformers import AutoFeatureExtractor
+        processor = AutoFeatureExtractor.from_pretrained(config.processor_name or config.model_name)
+        train_loader, dev_loader, test_loader = get_dataloaders(config, processor)
 
     print(f"Train: {len(train_loader.dataset)} | Dev: {len(dev_loader.dataset)} | Test: {len(test_loader.dataset)}", flush=True)
 

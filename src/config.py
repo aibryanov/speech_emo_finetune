@@ -25,10 +25,16 @@ class ExperimentConfig:
     # --- top_n ---
     top_n_layers: int = 4
 
-    # --- LSTM head ---
+    # --- LSTM on audio features (fine_tune_strategy == "lstm_features") ---
     lstm_hidden: int = 256
     lstm_layers: int = 2
     lstm_dropout: float = 0.1
+    # feature_type: mfcc | mfcc_delta | logmel | combined (mfcc_delta + logmel)
+    feature_type: str = "combined"
+    n_mfcc: int = 40
+    n_mels: int = 80
+    n_fft: int = 400
+    hop_length: int = 160
 
     # --- training ---
     batch_size: int = 8

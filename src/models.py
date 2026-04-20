@@ -82,6 +82,43 @@ class LSTMSpeechEmotionModel(nn.Module):
         return logits
 
 
+def _lstm_feature_dim(config) -> int:
+    if config.feature_type == "mfcc":
+        return config.n_mfcc
+    elif config.feature_type == "mfcc_delta":
+        return config.n_mfcc * 3
+    elif config.feature_type == "logmel":
+        return config.n_mels
+    else:  # combined
+        return config.n_mfcc * 3 + config.n_mels
+
+
+class LSTMFeaturesModel(nn.Module):
+    """BiLSTM trained on handcrafted audio features (MFCC, log-mel, deltas).
+    No transformer backbone — standalone model.
+    """
+
+    def __init__(self, feature_dim: int, lstm_hidden: int, lstm_layers: int, lstm_dropout: float, num_labels: int = NUM_LABELS):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            feature_dim, lstm_hidden, num_layers=lstm_layers,
+            batch_first=True, bidirectional=True,
+            dropout=lstm_dropout if lstm_layers > 1 else 0.0,
+        )
+        self.classifier = nn.Linear(lstm_hidden * 2, num_labels)
+
+    def forward(self, features: torch.Tensor, attention_mask: torch.Tensor | None = None, **kwargs):
+        # features: (B, T, feature_dim)
+        lstm_out, _ = self.lstm(features)  # (B, T, 2*lstm_hidden)
+
+        if attention_mask is None:
+            attention_mask = torch.ones(lstm_out.shape[:2], device=lstm_out.device, dtype=torch.long)
+
+        mask = attention_mask.unsqueeze(-1).float()
+        pooled = (lstm_out * mask).sum(dim=1) / mask.sum(dim=1).clamp(min=1)
+        return self.classifier(pooled)
+
+
 def _get_backbone_hidden_size(backbone: nn.Module) -> int:
     cfg = backbone.config
     for attr in ("hidden_size", "d_model", "encoder_embed_dim"):
@@ -152,16 +189,10 @@ def build_model(config: ExperimentConfig) -> nn.Module:
     elif strategy == "full":
         model = SpeechEmotionModel(backbone, hidden_size, config.num_labels)
 
-    elif strategy == "lstm":
-        _freeze_all(backbone)
-        model = LSTMSpeechEmotionModel(
-            backbone,
-            hidden_size,
-            config.lstm_hidden,
-            config.lstm_layers,
-            config.lstm_dropout,
-            config.num_labels,
-        )
+    elif strategy == "lstm_features":
+        feature_dim = _lstm_feature_dim(config)
+        model = LSTMFeaturesModel(feature_dim, config.lstm_hidden, config.lstm_layers, config.lstm_dropout, config.num_labels)
+        return model  # no backbone needed
 
     else:
         raise ValueError(f"Unknown fine_tune_strategy: {strategy!r}")
