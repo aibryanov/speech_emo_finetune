@@ -172,6 +172,10 @@ def _freeze_backbone_except_top_n(backbone: nn.Module, top_n: int):
 
 def build_model(config: ExperimentConfig) -> nn.Module:
     backbone = AutoModel.from_pretrained(config.model_name)
+
+    if getattr(config, "use_spec_augment", False):
+        backbone.config.apply_spec_augment = True
+
     hidden_size = _get_backbone_hidden_size(backbone)
     strategy = config.fine_tune_strategy
 

@@ -60,11 +60,40 @@ def stratified_split(hf_dataset, dev_ratio: float, seed: int):
     return hf_dataset.select(train_idx.tolist()), hf_dataset.select(dev_idx.tolist())
 
 
+def _augment_waveform(waveform: torch.Tensor, config: ExperimentConfig) -> torch.Tensor:
+    """Apply random waveform augmentations (training only)."""
+    # Gaussian noise
+    if config.aug_noise_std > 0:
+        waveform = waveform + torch.randn_like(waveform) * config.aug_noise_std
+    # Random time masking — zero out a contiguous segment
+    if config.aug_time_mask_ratio > 0:
+        T = waveform.shape[0]
+        mask_len = int(T * config.aug_time_mask_ratio * torch.rand(1).item())
+        if mask_len > 0:
+            start = torch.randint(0, max(1, T - mask_len), (1,)).item()
+            waveform = waveform.clone()
+            waveform[start: start + mask_len] = 0.0
+    # Amplitude jitter
+    lo, hi = config.aug_amplitude_range[0], config.aug_amplitude_range[1]
+    scale = lo + (hi - lo) * torch.rand(1).item()
+    waveform = (waveform * scale).clamp(-1.0, 1.0)
+    return waveform
+
+
 class EmotionDataset(Dataset):
-    def __init__(self, hf_dataset, processor: AutoFeatureExtractor, max_len_samples: int):
+    def __init__(
+        self,
+        hf_dataset,
+        processor: AutoFeatureExtractor,
+        max_len_samples: int,
+        config: ExperimentConfig | None = None,
+        training: bool = False,
+    ):
         self.data = hf_dataset
         self.processor = processor
         self.max_len_samples = max_len_samples
+        self.config = config
+        self.training = training
 
     def __len__(self) -> int:
         return len(self.data)
@@ -77,6 +106,9 @@ class EmotionDataset(Dataset):
             waveform = F.resample(waveform.unsqueeze(0), sr, SAMPLE_RATE).squeeze(0)
 
         waveform = waveform[: self.max_len_samples]
+
+        if self.training and self.config is not None and self.config.augment:
+            waveform = _augment_waveform(waveform, self.config)
 
         inputs = self.processor(
             waveform.numpy(),
@@ -222,9 +254,9 @@ def get_dataloaders(
     max_len = int(config.max_audio_len_s * SAMPLE_RATE)
     _collate = partial(collate_fn, max_len_samples=max_len)
 
-    train_ds = EmotionDataset(train_raw, processor, max_len)
-    dev_ds = EmotionDataset(dev_raw, processor, max_len)
-    test_ds = EmotionDataset(test_raw, processor, max_len)
+    train_ds = EmotionDataset(train_raw, processor, max_len, config=config, training=True)
+    dev_ds = EmotionDataset(dev_raw, processor, max_len, config=config, training=False)
+    test_ds = EmotionDataset(test_raw, processor, max_len, config=config, training=False)
 
     train_loader = DataLoader(
         train_ds,

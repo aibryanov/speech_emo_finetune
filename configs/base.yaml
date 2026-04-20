@@ -4,6 +4,13 @@ lr: 3.0e-4
 epochs: 10
 weight_decay: 0.01
 warmup_ratio: 0.1
+scheduler_type: linear
+label_smoothing: 0.0
+augment: false
+aug_noise_std: 0.005
+aug_time_mask_ratio: 0.1
+aug_amplitude_range: [0.8, 1.2]
+use_spec_augment: false
 dev_ratio: 0.15
 seed: 42
 max_audio_len_s: 10.0

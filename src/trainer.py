@@ -12,7 +12,7 @@ from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
-from transformers import get_linear_schedule_with_warmup
+from transformers import get_cosine_schedule_with_warmup, get_linear_schedule_with_warmup
 
 from src.config import ExperimentConfig
 from src.metrics import compute_metrics
@@ -43,11 +43,16 @@ class Trainer:
 
         total_steps = (len(train_loader) // config.grad_accum_steps) * config.epochs
         warmup_steps = int(total_steps * config.warmup_ratio)
-        self.scheduler = get_linear_schedule_with_warmup(
-            self.optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
-        )
+        if getattr(config, "scheduler_type", "linear") == "cosine":
+            self.scheduler = get_cosine_schedule_with_warmup(
+                self.optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
+            )
+        else:
+            self.scheduler = get_linear_schedule_with_warmup(
+                self.optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
+            )
 
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = nn.CrossEntropyLoss(label_smoothing=getattr(config, "label_smoothing", 0.0))
         self.best_metric = -1.0
         self.metrics_log: list = []
 

@@ -43,6 +43,15 @@ class ExperimentConfig:
     epochs: int = 10
     weight_decay: float = 1e-2
     warmup_ratio: float = 0.1
+    scheduler_type: str = "linear"  # linear | cosine
+    label_smoothing: float = 0.0
+
+    # --- augmentation ---
+    augment: bool = False
+    aug_noise_std: float = 0.005
+    aug_time_mask_ratio: float = 0.1
+    aug_amplitude_range: List[float] = field(default_factory=lambda: [0.8, 1.2])
+    use_spec_augment: bool = False
 
     # --- data ---
     dev_ratio: float = 0.15
