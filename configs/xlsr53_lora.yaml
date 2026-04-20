@@ -1,0 +1,15 @@
+model_name: facebook/wav2vec2-large-xlsr-53
+processor_name: facebook/wav2vec2-large-xlsr-53
+fine_tune_strategy: lora
+lora_rank: 16
+lora_alpha: 32
+lora_target_modules:
+  - q_proj
+  - v_proj
+batch_size: 4
+grad_accum_steps: 8
+lr: 1.0e-4
+epochs: 15
+warmup_ratio: 0.05
+run_name: xlsr53_lora
+output_dir: outputs/xlsr53_lora

@@ -1,0 +1,10 @@
+model_name: facebook/wav2vec2-large-xlsr-53
+processor_name: facebook/wav2vec2-large-xlsr-53
+fine_tune_strategy: full
+batch_size: 4
+grad_accum_steps: 8
+lr: 3.0e-5
+epochs: 15
+warmup_ratio: 0.05
+run_name: xlsr53_full
+output_dir: outputs/xlsr53_full
