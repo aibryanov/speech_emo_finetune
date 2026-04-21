@@ -177,7 +177,9 @@ class Trainer:
                 self.best_metric = dev_metrics["f1_weighted"]
                 self.save_checkpoint(best_ckpt, epoch + 1)
 
-            if save_every > 0 and (epoch + 1) % save_every == 0:
+            is_periodic = save_every > 0 and (epoch + 1) % save_every == 0
+            is_first = (epoch + 1 == start_epoch + 1)
+            if is_periodic or is_first:
                 periodic_ckpt = self.output_dir / f"checkpoint_epoch_{epoch+1:03d}.pt"
                 self.save_checkpoint(periodic_ckpt, epoch + 1)
                 if checkpoint_callback is not None:
