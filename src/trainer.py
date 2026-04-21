@@ -38,8 +38,12 @@ class Trainer:
         self.output_dir = Path(config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        trainable = [p for p in model.parameters() if p.requires_grad]
-        self.optimizer = AdamW(trainable, lr=config.lr, weight_decay=config.weight_decay)
+        head_params = [p for n, p in model.named_parameters() if p.requires_grad and "classifier" in n]
+        other_params = [p for n, p in model.named_parameters() if p.requires_grad and "classifier" not in n]
+        param_groups = [{"params": other_params, "lr": config.lr}]
+        if head_params:
+            param_groups.append({"params": head_params, "lr": getattr(config, "head_lr", config.lr)})
+        self.optimizer = AdamW(param_groups, weight_decay=config.weight_decay)
 
         total_steps = (len(train_loader) // config.grad_accum_steps) * config.epochs
         warmup_steps = (
