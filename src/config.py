@@ -43,6 +43,7 @@ class ExperimentConfig:
     epochs: int = 10
     weight_decay: float = 1e-2
     warmup_ratio: float = 0.1
+    warmup_steps: int = 0  # if > 0, overrides warmup_ratio
     scheduler_type: str = "linear"  # linear | cosine
     label_smoothing: float = 0.0
 

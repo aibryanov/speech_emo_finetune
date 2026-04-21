@@ -42,7 +42,10 @@ class Trainer:
         self.optimizer = AdamW(trainable, lr=config.lr, weight_decay=config.weight_decay)
 
         total_steps = (len(train_loader) // config.grad_accum_steps) * config.epochs
-        warmup_steps = int(total_steps * config.warmup_ratio)
+        warmup_steps = (
+            config.warmup_steps if getattr(config, "warmup_steps", 0) > 0
+            else int(total_steps * config.warmup_ratio)
+        )
         if getattr(config, "scheduler_type", "linear") == "cosine":
             self.scheduler = get_cosine_schedule_with_warmup(
                 self.optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
