@@ -9,6 +9,7 @@ lora_target_modules:
 batch_size: 4
 grad_accum_steps: 8
 lr: 1.0e-4
+head_lr: 5.0e-3
 epochs: 15
 warmup_ratio: 0.05
 run_name: hubert_large_lora
