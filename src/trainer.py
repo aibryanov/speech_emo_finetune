@@ -112,16 +112,41 @@ class Trainer:
         with open(self.output_dir / "metrics.jsonl", "a") as f:
             f.write(json.dumps(record) + "\n")
 
-    def save_checkpoint(self, path: Path):
-        torch.save({"model_state_dict": self.model.state_dict()}, path)
+    def save_checkpoint(self, path: Path, epoch: int):
+        torch.save({
+            "model_state_dict": self.model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "scheduler_state_dict": self.scheduler.state_dict(),
+            "epoch": epoch,
+            "best_metric": self.best_metric,
+        }, path)
 
-    def load_checkpoint(self, path: Path):
-        ckpt = torch.load(path, map_location=self.device)
+    def load_checkpoint(self, path: Path) -> int:
+        """Load full checkpoint. Returns the next epoch index to start from."""
+        ckpt = torch.load(path, map_location=self.device, weights_only=False)
+        self.model.load_state_dict(ckpt["model_state_dict"])
+        if "optimizer_state_dict" in ckpt:
+            self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+        if "scheduler_state_dict" in ckpt:
+            self.scheduler.load_state_dict(ckpt["scheduler_state_dict"])
+        if "best_metric" in ckpt:
+            self.best_metric = ckpt["best_metric"]
+        return ckpt.get("epoch", 0)
+
+    def _load_best_model(self, path: Path):
+        ckpt = torch.load(path, map_location=self.device, weights_only=False)
         self.model.load_state_dict(ckpt["model_state_dict"])
 
     # ------------------------------------------------------------------
-    def fit(self):
+    def fit(self, checkpoint_callback=None):
         best_ckpt = self.output_dir / "best_model.pt"
+        save_every = getattr(self.config, "save_every_n_epochs", 5)
+
+        start_epoch = 0
+        resume_from = getattr(self.config, "resume_from", "")
+        if resume_from and Path(resume_from).exists():
+            start_epoch = self.load_checkpoint(Path(resume_from))
+            print(f"Resumed from {resume_from} — starting at epoch {start_epoch + 1}", flush=True)
 
         header = f"{'Epoch':>5}  {'Loss':>7}  {'Acc':>6}  {'WAcc':>6}  {'F1mac':>6}  {'F1w':>6}  {'Time':>6}  {'Best':>4}"
         sep = "-" * len(header)
@@ -130,7 +155,7 @@ class Trainer:
         print(header, flush=True)
         print(sep, flush=True)
 
-        for epoch in range(self.config.epochs):
+        for epoch in range(start_epoch, self.config.epochs):
             t0 = time.time()
             train_loss = self.train_epoch(epoch)
             dev_metrics = self.eval_epoch(self.dev_loader, "dev")
@@ -150,7 +175,13 @@ class Trainer:
             is_best = dev_metrics["f1_weighted"] > self.best_metric
             if is_best:
                 self.best_metric = dev_metrics["f1_weighted"]
-                self.save_checkpoint(best_ckpt)
+                self.save_checkpoint(best_ckpt, epoch + 1)
+
+            if save_every > 0 and (epoch + 1) % save_every == 0:
+                periodic_ckpt = self.output_dir / f"checkpoint_epoch_{epoch+1:03d}.pt"
+                self.save_checkpoint(periodic_ckpt, epoch + 1)
+                if checkpoint_callback is not None:
+                    checkpoint_callback(periodic_ckpt)
 
             print(
                 f"{epoch+1:>5}  {train_loss:>7.4f}  "
@@ -164,7 +195,7 @@ class Trainer:
 
         # final evaluation on test set using best checkpoint
         print(f"\nLoading best checkpoint (f1_weighted={self.best_metric:.4f})...", flush=True)
-        self.load_checkpoint(best_ckpt)
+        self._load_best_model(best_ckpt)
         test_metrics = self.eval_epoch(self.test_loader, "test")
 
         test_record = {

@@ -59,6 +59,10 @@ class ExperimentConfig:
     max_audio_len_s: float = 10.0
     num_workers: int = 2
 
+    # --- checkpointing ---
+    save_every_n_epochs: int = 5
+    resume_from: str = ""  # path to checkpoint to resume from; empty = start fresh
+
     # --- output ---
     output_dir: str = "outputs/experiment"
     run_name: str = "experiment"
