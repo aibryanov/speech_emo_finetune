@@ -148,7 +148,7 @@ class Trainer:
             start_epoch = self.load_checkpoint(Path(resume_from))
             print(f"Resumed from {resume_from} — starting at epoch {start_epoch + 1}", flush=True)
 
-        header = f"{'Epoch':>5}  {'Loss':>7}  {'Acc':>6}  {'WAcc':>6}  {'F1mac':>6}  {'F1w':>6}  {'Time':>6}  {'Best':>4}"
+        header = f"{'Epoch':>5}  {'Loss':>7}  {'LR':>8}  {'Acc':>6}  {'WAcc':>6}  {'F1mac':>6}  {'F1w':>6}  {'Time':>6}  {'Best':>4}"
         sep = "-" * len(header)
         print(f"\nRun: {self.config.run_name}  |  strategy: {self.config.fine_tune_strategy}  |  model: {self.config.model_name}", flush=True)
         print(sep, flush=True)
@@ -172,6 +172,8 @@ class Trainer:
             }
             self._log(record)
 
+            current_lr = self.optimizer.param_groups[0]["lr"]
+
             is_best = dev_metrics["f1_weighted"] > self.best_metric
             if is_best:
                 self.best_metric = dev_metrics["f1_weighted"]
@@ -186,7 +188,7 @@ class Trainer:
                     checkpoint_callback(periodic_ckpt)
 
             print(
-                f"{epoch+1:>5}  {train_loss:>7.4f}  "
+                f"{epoch+1:>5}  {train_loss:>7.4f}  {current_lr:>8.2e}  "
                 f"{dev_metrics['accuracy']:>6.4f}  {dev_metrics['weighted_accuracy']:>6.4f}  "
                 f"{dev_metrics['f1_macro']:>6.4f}  {dev_metrics['f1_weighted']:>6.4f}  "
                 f"{elapsed:>5.0f}s  {'*' if is_best else ''}",
