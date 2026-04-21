@@ -11,8 +11,7 @@ lora_target_modules:
   - out_proj
 batch_size: 4
 grad_accum_steps: 8
-lr: 1.0e-4
-head_lr_multiplier: 20
+lr: 1.0e-5
 epochs: 30
 weight_decay: 0.01
 scheduler_type: cosine

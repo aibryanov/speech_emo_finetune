@@ -37,7 +37,6 @@ class ExperimentConfig:
     hop_length: int = 160
 
     # --- training ---
-    head_lr_multiplier: float = 1.0  # classifier head gets lr * this
     batch_size: int = 8
     grad_accum_steps: int = 4
     lr: float = 3e-4
