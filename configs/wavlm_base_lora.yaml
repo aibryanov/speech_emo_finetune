@@ -11,7 +11,7 @@ lora_target_modules:
   - out_proj
 batch_size: 8
 grad_accum_steps: 4
-lr: 2.0e-4
+lr: 2.0e-5
 head_lr: 5.0e-3
 epochs: 30
 weight_decay: 0.01
