@@ -7,3 +7,4 @@ lr: 3.0e-4
 epochs: 10
 run_name: hubert_large_head
 output_dir: outputs/hubert_large_head
+merge_labels: true

@@ -12,3 +12,4 @@ lr: 1.0e-4
 epochs: 10
 run_name: wav2vec2_xlsr_lora
 output_dir: outputs/wav2vec2_xlsr_lora
+merge_labels: true

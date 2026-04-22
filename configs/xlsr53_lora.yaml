@@ -13,3 +13,4 @@ epochs: 15
 warmup_ratio: 0.05
 run_name: xlsr53_lora
 output_dir: outputs/xlsr53_lora
+merge_labels: true

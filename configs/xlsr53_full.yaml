@@ -8,3 +8,4 @@ epochs: 15
 warmup_ratio: 0.05
 run_name: xlsr53_full
 output_dir: outputs/xlsr53_full
+merge_labels: true

@@ -13,3 +13,4 @@ lr: 1.0e-3
 epochs: 30
 run_name: lstm_features
 output_dir: outputs/lstm_features
+merge_labels: true

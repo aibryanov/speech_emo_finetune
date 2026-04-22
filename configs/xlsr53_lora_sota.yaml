@@ -25,3 +25,4 @@ aug_amplitude_range: [0.8, 1.2]
 use_spec_augment: false
 run_name: xlsr53_lora_sota
 output_dir: outputs/xlsr53_lora_sota
+merge_labels: true

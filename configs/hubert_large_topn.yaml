@@ -8,3 +8,4 @@ lr: 5.0e-5
 epochs: 10
 run_name: hubert_large_topn
 output_dir: outputs/hubert_large_topn
+merge_labels: true

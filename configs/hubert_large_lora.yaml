@@ -14,3 +14,4 @@ epochs: 15
 warmup_ratio: 0.05
 run_name: hubert_large_lora
 output_dir: outputs/hubert_large_lora
+merge_labels: true

@@ -7,3 +7,4 @@ lr: 3.0e-4
 epochs: 10
 run_name: wav2vec2_xlsr_head
 output_dir: outputs/wav2vec2_xlsr_head
+merge_labels: true
