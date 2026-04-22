@@ -18,6 +18,24 @@ from src.config import ExperimentConfig
 from src.metrics import compute_metrics
 
 
+class FocalLoss(nn.Module):
+    """Focal Loss: down-weights easy examples, focuses on hard ones.
+    FL(p_t) = (1 - p_t)^gamma * CE(logits, targets)
+    """
+
+    def __init__(self, gamma: float = 2.0, label_smoothing: float = 0.0):
+        super().__init__()
+        self.gamma = gamma
+        self.label_smoothing = label_smoothing
+
+    def forward(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        ce = nn.functional.cross_entropy(
+            logits, targets, label_smoothing=self.label_smoothing, reduction="none"
+        )
+        p_t = torch.exp(-ce)  # probability assigned to the correct class
+        return ((1 - p_t) ** self.gamma * ce).mean()
+
+
 class Trainer:
     def __init__(
         self,
@@ -59,7 +77,13 @@ class Trainer:
                 self.optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps
             )
 
-        self.criterion = nn.CrossEntropyLoss(label_smoothing=getattr(config, "label_smoothing", 0.0))
+        if getattr(config, "use_focal_loss", False):
+            self.criterion = FocalLoss(
+                gamma=getattr(config, "focal_gamma", 2.0),
+                label_smoothing=getattr(config, "label_smoothing", 0.0),
+            )
+        else:
+            self.criterion = nn.CrossEntropyLoss(label_smoothing=getattr(config, "label_smoothing", 0.0))
         self.best_metric = -1.0
         self.metrics_log: list = []
 

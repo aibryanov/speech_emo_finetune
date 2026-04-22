@@ -47,6 +47,8 @@ class ExperimentConfig:
     warmup_steps: int = 0  # if > 0, overrides warmup_ratio
     scheduler_type: str = "linear"  # linear | cosine
     label_smoothing: float = 0.0
+    use_focal_loss: bool = False
+    focal_gamma: float = 2.0
 
     # --- augmentation ---
     augment: bool = False
