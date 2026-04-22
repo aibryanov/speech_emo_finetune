@@ -11,14 +11,21 @@ from sklearn.metrics import (
     f1_score,
 )
 
-from src.dataset import ID2LABEL, NUM_LABELS
+from src.dataset import ID2LABEL, MERGED_ID2LABEL, NUM_LABELS, NUM_MERGED_LABELS
 
 
-def compute_metrics(preds: np.ndarray, labels: np.ndarray) -> Dict:
-    label_names = [ID2LABEL[i] for i in range(NUM_LABELS)]
+def compute_metrics(preds: np.ndarray, labels: np.ndarray, merge_labels: bool = False) -> Dict:
+    if merge_labels:
+        id2label = MERGED_ID2LABEL
+        n = NUM_MERGED_LABELS
+    else:
+        id2label = ID2LABEL
+        n = NUM_LABELS
+
+    label_names = [id2label[i] for i in range(n)]
 
     report = classification_report(
-        labels, preds, labels=list(range(NUM_LABELS)), target_names=label_names, output_dict=True, zero_division=0
+        labels, preds, labels=list(range(n)), target_names=label_names, output_dict=True, zero_division=0
     )
 
     per_class = {
@@ -32,7 +39,7 @@ def compute_metrics(preds: np.ndarray, labels: np.ndarray) -> Dict:
         if name in report
     }
 
-    cm = confusion_matrix(labels, preds, labels=list(range(NUM_LABELS)))
+    cm = confusion_matrix(labels, preds, labels=list(range(n)))
 
     return {
         "accuracy": accuracy_score(labels, preds),

@@ -70,6 +70,7 @@ class ExperimentConfig:
     run_name: str = "experiment"
 
     # --- misc ---
+    merge_labels: bool = False  # merge 7 classes → 4 (positive/negative/neutral/other)
     num_labels: int = 7
 
 
@@ -87,5 +88,8 @@ def load_config(path: str) -> ExperimentConfig:
     for k, v in merged.items():
         if hasattr(cfg, k):
             setattr(cfg, k, v)
+
+    if cfg.merge_labels and "num_labels" not in override:
+        cfg.num_labels = 4
 
     return cfg

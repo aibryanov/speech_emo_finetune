@@ -26,6 +26,27 @@ LABEL2ID: Dict[str, int] = {
 ID2LABEL: Dict[int, str] = {v: k for k, v in LABEL2ID.items()}
 NUM_LABELS = len(LABEL2ID)
 
+# Merged 4-class scheme: positive / negative / neutral / other
+MERGED_LABEL2ID: Dict[str, int] = {
+    "positive": 0,  # happiness, enthusiasm
+    "negative": 1,  # anger, disgust
+    "neutral": 2,
+    "other": 3,     # sadness, fear
+}
+MERGED_ID2LABEL: Dict[int, str] = {v: k for k, v in MERGED_LABEL2ID.items()}
+NUM_MERGED_LABELS = len(MERGED_LABEL2ID)
+
+# Maps original 7-class id → merged 4-class id
+_MERGE_MAP: Dict[int, int] = {
+    0: 0,  # happiness  → positive
+    1: 3,  # sadness    → other
+    2: 1,  # anger      → negative
+    3: 3,  # fear       → other
+    4: 1,  # disgust    → negative
+    5: 0,  # enthusiasm → positive
+    6: 2,  # neutral    → neutral
+}
+
 SAMPLE_RATE = 16_000
 
 
@@ -117,7 +138,10 @@ class EmotionDataset(Dataset):
         )
         input_values = inputs["input_values"].squeeze(0)  # (T,)
 
-        label = torch.tensor(LABEL2ID[ex["emotion"]], dtype=torch.long)
+        label_id = LABEL2ID[ex["emotion"]]
+        if self.config is not None and getattr(self.config, "merge_labels", False):
+            label_id = _MERGE_MAP[label_id]
+        label = torch.tensor(label_id, dtype=torch.long)
         return {"input_values": input_values, "label": label}
 
 
@@ -197,7 +221,10 @@ class AudioFeaturesDataset(Dataset):
 
         waveform = waveform[: self.max_len_samples]
         features = _extract_features(waveform, self.config)  # (T_frames, feature_dim)
-        label = torch.tensor(LABEL2ID[ex["emotion"]], dtype=torch.long)
+        label_id = LABEL2ID[ex["emotion"]]
+        if getattr(self.config, "merge_labels", False):
+            label_id = _MERGE_MAP[label_id]
+        label = torch.tensor(label_id, dtype=torch.long)
         return {"features": features, "label": label}
 
 
