@@ -3,15 +3,28 @@ processor_name: facebook/hubert-large-ls960-ft
 fine_tune_strategy: lora
 lora_rank: 8
 lora_alpha: 16
+lora_dropout: 0.05
 lora_target_modules:
   - q_proj
+  - k_proj
   - v_proj
-batch_size: 4
-grad_accum_steps: 8
-lr: 1.0e-4
+  - out_proj
+batch_size: 8
+grad_accum_steps: 4
+lr: 2.0e-5
 head_lr: 5.0e-3
-epochs: 15
-warmup_ratio: 0.05
+epochs: 30
+weight_decay: 0.01
+scheduler_type: cosine
+warmup_steps: 20
+label_smoothing: 0.1
+use_focal_loss: true
+focal_gamma: 2.0
+augment: true
+aug_noise_std: 0.005
+aug_time_mask_ratio: 0.1
+aug_amplitude_range: [0.8, 1.2]
+use_spec_augment: false
 run_name: hubert_large_lora
 output_dir: outputs/hubert_large_lora
 merge_labels: true

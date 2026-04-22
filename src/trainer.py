@@ -253,4 +253,15 @@ class Trainer:
         for cls, vals in test_metrics["per_class"].items():
             print(f"  {cls:12s}  {vals['precision']:6.3f}  {vals['recall']:6.3f}  {vals['f1']:6.3f}  {int(vals['support']):5d}", flush=True)
 
+        self._save_adapter()
         return test_metrics
+
+    def _save_adapter(self):
+        """Save LoRA adapter weights + classifier head (compact, for inference/resume)."""
+        backbone = getattr(self.model, "backbone", None)
+        if backbone is None or not hasattr(backbone, "save_pretrained"):
+            return
+        adapter_dir = self.output_dir / "adapter"
+        backbone.save_pretrained(adapter_dir)
+        torch.save(self.model.classifier.state_dict(), adapter_dir / "classifier_head.pt")
+        print(f"\nAdapter saved → {adapter_dir}", flush=True)
