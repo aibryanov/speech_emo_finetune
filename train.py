@@ -6,7 +6,9 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 import random
+import warnings
 
 import numpy as np
 import torch
@@ -15,6 +17,9 @@ from src.config import load_config
 from src.dataset import get_dataloaders, get_feature_dataloaders
 from src.models import build_model
 from src.trainer import Trainer
+
+warnings.filterwarnings("ignore")
+logging.getLogger("transformers").setLevel(logging.ERROR)
 
 
 def set_seed(seed: int):
