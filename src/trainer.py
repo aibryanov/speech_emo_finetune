@@ -144,15 +144,13 @@ class Trainer:
             f.write(json.dumps(record) + "\n")
 
     def save_checkpoint(self, path: Path, epoch: int):
-        ckpt = {
+        torch.save({
             "model_state_dict": self.model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "scheduler_state_dict": self.scheduler.state_dict(),
             "epoch": epoch,
             "best_metric": self.best_metric,
-        }
-        if self.config.fine_tune_strategy != "full":
-            ckpt["optimizer_state_dict"] = self.optimizer.state_dict()
-            ckpt["scheduler_state_dict"] = self.scheduler.state_dict()
-        torch.save(ckpt, path)
+        }, path)
 
     def load_checkpoint(self, path: Path) -> int:
         """Load full checkpoint. Returns the next epoch index to start from."""
@@ -259,9 +257,10 @@ class Trainer:
         return test_metrics
 
     def _save_adapter(self):
-        """Save LoRA adapter weights + classifier head (compact, for inference/resume)."""
+        """Save LoRA adapter weights + classifier head. Only for lora strategy."""
+        from peft import PeftModel
         backbone = getattr(self.model, "backbone", None)
-        if backbone is None or not hasattr(backbone, "save_pretrained"):
+        if not isinstance(backbone, PeftModel):
             return
         adapter_dir = self.output_dir / "adapter"
         backbone.save_pretrained(adapter_dir)
