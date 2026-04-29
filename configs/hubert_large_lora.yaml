@@ -27,4 +27,3 @@ aug_amplitude_range: [0.8, 1.2]
 use_spec_augment: false
 run_name: hubert_large_lora
 output_dir: outputs/hubert_large_lora
-merge_labels: true

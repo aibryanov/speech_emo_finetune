@@ -27,4 +27,3 @@ aug_amplitude_range: [0.8, 1.2]
 use_spec_augment: false
 run_name: wavlm_base_lora
 output_dir: outputs/wavlm_base_lora
-merge_labels: true

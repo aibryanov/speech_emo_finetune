@@ -25,5 +25,5 @@ top_n_layers: 4
 lstm_hidden: 256
 lstm_layers: 2
 lstm_dropout: 0.1
-merge_labels: true
+merge_labels: false
 num_labels: 7
