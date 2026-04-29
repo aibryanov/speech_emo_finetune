@@ -144,13 +144,15 @@ class Trainer:
             f.write(json.dumps(record) + "\n")
 
     def save_checkpoint(self, path: Path, epoch: int):
-        torch.save({
+        ckpt = {
             "model_state_dict": self.model.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
-            "scheduler_state_dict": self.scheduler.state_dict(),
             "epoch": epoch,
             "best_metric": self.best_metric,
-        }, path)
+        }
+        if self.config.fine_tune_strategy != "full":
+            ckpt["optimizer_state_dict"] = self.optimizer.state_dict()
+            ckpt["scheduler_state_dict"] = self.scheduler.state_dict()
+        torch.save(ckpt, path)
 
     def load_checkpoint(self, path: Path) -> int:
         """Load full checkpoint. Returns the next epoch index to start from."""
