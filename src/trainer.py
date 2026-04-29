@@ -96,11 +96,10 @@ class Trainer:
 
         pbar = tqdm(self.train_loader, desc=f"Epoch {epoch+1} [train]", leave=False)
         for i, batch in enumerate(pbar):
-            input_values = batch["input_values"].to(self.device)
-            attention_mask = batch["attention_mask"].to(self.device)
             labels = batch["labels"].to(self.device)
+            inputs = {k: v.to(self.device) for k, v in batch.items() if k != "labels"}
 
-            logits = self.model(input_values=input_values, attention_mask=attention_mask)
+            logits = self.model(**inputs)
             loss = self.criterion(logits, labels) / self.config.grad_accum_steps
             loss.backward()
 
@@ -123,11 +122,10 @@ class Trainer:
         all_preds, all_labels = [], []
 
         for batch in tqdm(loader, desc=f"  [{split}]", leave=False):
-            input_values = batch["input_values"].to(self.device)
-            attention_mask = batch["attention_mask"].to(self.device)
             labels = batch["labels"]
+            inputs = {k: v.to(self.device) for k, v in batch.items() if k != "labels"}
 
-            logits = self.model(input_values=input_values, attention_mask=attention_mask)
+            logits = self.model(**inputs)
             preds = logits.argmax(dim=-1).cpu()
 
             all_preds.append(preds)

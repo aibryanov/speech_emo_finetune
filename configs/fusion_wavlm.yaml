@@ -1,0 +1,26 @@
+model_name: Aniemore/wavlm-emotion-russian-resd
+processor_name: microsoft/wavlm-base
+fine_tune_strategy: fusion
+# BiLSTM on audio features
+lstm_hidden: 256
+lstm_layers: 2
+lstm_dropout: 0.1
+feature_type: combined
+n_mfcc: 40
+n_mels: 80
+n_fft: 400
+hop_length: 160
+# MLP fusion head
+fusion_hidden: 512
+fusion_dropout: 0.3
+# training
+batch_size: 8
+grad_accum_steps: 4
+lr: 1.0e-3
+head_lr: 1.0e-3
+epochs: 30
+weight_decay: 0.01
+scheduler_type: cosine
+warmup_ratio: 0.05
+run_name: fusion_wavlm
+output_dir: outputs/fusion_wavlm

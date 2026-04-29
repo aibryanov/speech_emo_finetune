@@ -71,6 +71,10 @@ class ExperimentConfig:
     output_dir: str = "outputs/experiment"
     run_name: str = "experiment"
 
+    # --- fusion model ---
+    fusion_hidden: int = 512
+    fusion_dropout: float = 0.3
+
     # --- misc ---
     merge_labels: bool = False  # merge 7 classes → 4 (positive/negative/neutral/other)
     num_labels: int = 7

@@ -245,6 +245,138 @@ def features_collate_fn(batch: List[Dict]) -> Dict[str, torch.Tensor]:
     return {"features": padded, "attention_mask": mask, "labels": labels}
 
 
+def _compute_stat_features(waveform: torch.Tensor, config: ExperimentConfig) -> torch.Tensor:
+    """Global statistics over time: mean + std of MFCC and log-mel. Shape: (n_mfcc*2 + n_mels*2,)."""
+    mfcc_transform = T.MFCC(
+        sample_rate=SAMPLE_RATE,
+        n_mfcc=config.n_mfcc,
+        melkwargs={"n_fft": config.n_fft, "hop_length": config.hop_length, "n_mels": config.n_mels},
+    )
+    mel_transform = T.MelSpectrogram(
+        sample_rate=SAMPLE_RATE, n_fft=config.n_fft, hop_length=config.hop_length, n_mels=config.n_mels
+    )
+    db_transform = T.AmplitudeToDB()
+
+    x = waveform.unsqueeze(0)
+    mfcc = mfcc_transform(x).squeeze(0)        # (n_mfcc, T)
+    logmel = db_transform(mel_transform(x)).squeeze(0)  # (n_mels, T)
+
+    stats = []
+    for feat in (mfcc, logmel):
+        stats.append(feat.mean(dim=-1))
+        stats.append(feat.std(dim=-1))
+    return torch.cat(stats)  # (n_mfcc*2 + n_mels*2,)
+
+
+class FusionDataset(Dataset):
+    """Returns backbone input_values + LSTM features + global stat features."""
+
+    def __init__(
+        self,
+        hf_dataset,
+        processor: AutoFeatureExtractor,
+        config: ExperimentConfig,
+        max_len_samples: int,
+        training: bool = False,
+    ):
+        self.data = hf_dataset
+        self.processor = processor
+        self.config = config
+        self.max_len_samples = max_len_samples
+        self.training = training
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+        ex = self.data[idx]
+        waveform, sr = _decode_audio(ex["speech"])
+
+        if sr != SAMPLE_RATE:
+            waveform = F.resample(waveform.unsqueeze(0), sr, SAMPLE_RATE).squeeze(0)
+        waveform = waveform[: self.max_len_samples]
+
+        if self.training and self.config.augment:
+            waveform = _augment_waveform(waveform, self.config)
+
+        inputs = self.processor(waveform.numpy(), sampling_rate=SAMPLE_RATE, return_tensors="pt")
+        input_values = inputs["input_values"].squeeze(0)
+
+        features = _extract_features(waveform, self.config)       # (T_frames, feat_dim)
+        stat_features = _compute_stat_features(waveform, self.config)  # (stat_dim,)
+
+        label_id = LABEL2ID[ex["emotion"]]
+        if getattr(self.config, "merge_labels", False):
+            label_id = _MERGE_MAP[label_id]
+        return {
+            "input_values": input_values,
+            "features": features,
+            "stat_features": stat_features,
+            "label": torch.tensor(label_id, dtype=torch.long),
+        }
+
+
+def fusion_collate_fn(batch: List[Dict], max_len_samples: int) -> Dict[str, torch.Tensor]:
+    B = len(batch)
+
+    # pad input_values
+    iv_lengths = [min(ex["input_values"].shape[0], max_len_samples) for ex in batch]
+    max_iv = max(iv_lengths)
+    padded_iv = torch.zeros(B, max_iv)
+    attention_mask = torch.zeros(B, max_iv, dtype=torch.long)
+    for i, (ex, L) in enumerate(zip(batch, iv_lengths)):
+        padded_iv[i, :L] = ex["input_values"][:L]
+        attention_mask[i, :L] = 1
+
+    # pad features (for BiLSTM)
+    feat_lengths = [ex["features"].shape[0] for ex in batch]
+    max_feat = max(feat_lengths)
+    feat_dim = batch[0]["features"].shape[1]
+    padded_feat = torch.zeros(B, max_feat, feat_dim)
+    for i, (ex, L) in enumerate(zip(batch, feat_lengths)):
+        padded_feat[i, :L] = ex["features"]
+
+    stat_features = torch.stack([ex["stat_features"] for ex in batch])
+    labels = torch.stack([ex["label"] for ex in batch])
+
+    return {
+        "input_values": padded_iv,
+        "attention_mask": attention_mask,
+        "features": padded_feat,
+        "stat_features": stat_features,
+        "labels": labels,
+    }
+
+
+def get_fusion_dataloaders(
+    config: ExperimentConfig, processor: AutoFeatureExtractor
+) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    raw = load_resd()
+    train_raw, dev_raw = stratified_split(raw["train"], config.dev_ratio, config.seed)
+    test_raw = raw["test"]
+
+    max_len = int(config.max_audio_len_s * SAMPLE_RATE)
+    _collate = partial(fusion_collate_fn, max_len_samples=max_len)
+
+    train_ds = FusionDataset(train_raw, processor, config, max_len, training=True)
+    dev_ds = FusionDataset(dev_raw, processor, config, max_len, training=False)
+    test_ds = FusionDataset(test_raw, processor, config, max_len, training=False)
+
+    train_loader = DataLoader(
+        train_ds, batch_size=config.batch_size, shuffle=True,
+        num_workers=config.num_workers, collate_fn=_collate, pin_memory=True,
+    )
+    dev_loader = DataLoader(
+        dev_ds, batch_size=config.batch_size * 2, shuffle=False,
+        num_workers=config.num_workers, collate_fn=_collate, pin_memory=True,
+    )
+    test_loader = DataLoader(
+        test_ds, batch_size=config.batch_size * 2, shuffle=False,
+        num_workers=config.num_workers, collate_fn=_collate, pin_memory=True,
+    )
+    return train_loader, dev_loader, test_loader
+
+
 def get_feature_dataloaders(config: ExperimentConfig) -> Tuple[DataLoader, DataLoader, DataLoader]:
     raw = load_resd()
     train_raw, dev_raw = stratified_split(raw["train"], config.dev_ratio, config.seed)
