@@ -1,0 +1,11 @@
+model_name: microsoft/wavlm-large
+processor_name: microsoft/wavlm-large
+fine_tune_strategy: full
+batch_size: 2
+grad_accum_steps: 16
+lr: 2.0e-5
+epochs: 15
+weight_decay: 0.01
+warmup_ratio: 0.05
+run_name: wavlm_large_full
+output_dir: outputs/wavlm_large_full
