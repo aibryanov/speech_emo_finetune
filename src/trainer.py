@@ -177,7 +177,7 @@ class Trainer:
             start_epoch = self.load_checkpoint(Path(resume_from))
             print(f"Resumed from {resume_from} — starting at epoch {start_epoch + 1}", flush=True)
 
-        header = f"{'Epoch':>5}  {'Loss':>7}  {'LR':>8}  {'Acc':>6}  {'WAcc':>6}  {'F1mac':>6}  {'F1w':>6}  {'Time':>6}  {'Best':>4}"
+        header = f"{'Epoch':>5}  {'Loss':>7}  {'LR':>8}  {'Tr.Acc':>6}  {'Tr.F1w':>6}  {'Acc':>6}  {'WAcc':>6}  {'F1mac':>6}  {'F1w':>6}  {'Time':>6}  {'Best':>4}"
         sep = "-" * len(header)
         print(f"\nRun: {self.config.run_name}  |  strategy: {self.config.fine_tune_strategy}  |  model: {self.config.model_name}", flush=True)
         print(sep, flush=True)
@@ -187,12 +187,15 @@ class Trainer:
         for epoch in range(start_epoch, self.config.epochs):
             t0 = time.time()
             train_loss = self.train_epoch(epoch)
+            train_metrics = self.eval_epoch(self.train_loader, "train")
             dev_metrics = self.eval_epoch(self.dev_loader, "dev")
             elapsed = time.time() - t0
 
             record = {
                 "epoch": epoch + 1,
                 "train_loss": round(train_loss, 4),
+                "train_accuracy": round(train_metrics["accuracy"], 4),
+                "train_f1_weighted": round(train_metrics["f1_weighted"], 4),
                 "dev_accuracy": round(dev_metrics["accuracy"], 4),
                 "dev_weighted_accuracy": round(dev_metrics["weighted_accuracy"], 4),
                 "dev_f1_macro": round(dev_metrics["f1_macro"], 4),
@@ -218,6 +221,7 @@ class Trainer:
 
             print(
                 f"{epoch+1:>5}  {train_loss:>7.4f}  {current_lr:>8.2e}  "
+                f"{train_metrics['accuracy']:>6.4f}  {train_metrics['f1_weighted']:>6.4f}  "
                 f"{dev_metrics['accuracy']:>6.4f}  {dev_metrics['weighted_accuracy']:>6.4f}  "
                 f"{dev_metrics['f1_macro']:>6.4f}  {dev_metrics['f1_weighted']:>6.4f}  "
                 f"{elapsed:>5.0f}s  {'*' if is_best else ''}",
