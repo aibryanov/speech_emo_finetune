@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import partial
 from typing import Dict, List, Tuple
+import warnings
 
 import torch
 import torchaudio
@@ -209,10 +210,11 @@ def _extract_features(waveform: torch.Tensor, config: ExperimentConfig) -> torch
 class AudioFeaturesDataset(Dataset):
     """Dataset that extracts MFCC/mel features — used for lstm_features strategy."""
 
-    def __init__(self, hf_dataset, config: ExperimentConfig, max_len_samples: int):
+    def __init__(self, hf_dataset, config: ExperimentConfig, max_len_samples: int, training: bool = False):
         self.data = hf_dataset
         self.config = config
         self.max_len_samples = max_len_samples
+        self.training = training
 
     def __len__(self) -> int:
         return len(self.data)
@@ -225,6 +227,10 @@ class AudioFeaturesDataset(Dataset):
             waveform = F.resample(waveform.unsqueeze(0), sr, SAMPLE_RATE).squeeze(0)
 
         waveform = waveform[: self.max_len_samples]
+
+        if self.training and self.config.augment:
+            waveform = _augment_waveform(waveform, self.config)
+
         features = _extract_features(waveform, self.config)  # (T_frames, feature_dim)
         label_id = LABEL2ID[ex["emotion"]]
         if getattr(self.config, "merge_labels", False):
@@ -389,9 +395,9 @@ def get_feature_dataloaders(config: ExperimentConfig) -> Tuple[DataLoader, DataL
 
     max_len = int(config.max_audio_len_s * SAMPLE_RATE)
 
-    train_ds = AudioFeaturesDataset(train_raw, config, max_len)
-    dev_ds = AudioFeaturesDataset(dev_raw, config, max_len)
-    test_ds = AudioFeaturesDataset(test_raw, config, max_len)
+    train_ds = AudioFeaturesDataset(train_raw, config, max_len, training=True)
+    dev_ds = AudioFeaturesDataset(dev_raw, config, max_len, training=False)
+    test_ds = AudioFeaturesDataset(test_raw, config, max_len, training=False)
 
     train_loader = DataLoader(
         train_ds, batch_size=config.batch_size, shuffle=True,
