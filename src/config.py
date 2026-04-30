@@ -71,6 +71,10 @@ class ExperimentConfig:
     output_dir: str = "outputs/experiment"
     run_name: str = "experiment"
 
+    # --- MLP head (lstm_features and fusion) ---
+    mlp_hidden: List[int] = field(default_factory=lambda: [256])
+    mlp_dropout: float = 0.3
+
     # --- fusion model ---
     fusion_hidden: int = 512
     fusion_dropout: float = 0.3

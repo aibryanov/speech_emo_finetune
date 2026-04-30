@@ -171,22 +171,41 @@ def _lstm_feature_dim(config) -> int:
         return config.n_mfcc * 3 + config.n_mels
 
 
+def _build_mlp(in_dim: int, hidden_dims: list, dropout: float, out_dim: int) -> nn.Sequential:
+    """Linear → ReLU → Dropout for each hidden dim, then final Linear."""
+    layers = []
+    current = in_dim
+    for h in hidden_dims:
+        layers += [nn.Linear(current, h), nn.ReLU(), nn.Dropout(dropout)]
+        current = h
+    layers.append(nn.Linear(current, out_dim))
+    return nn.Sequential(*layers)
+
+
 class LSTMFeaturesModel(nn.Module):
     """BiLSTM trained on handcrafted audio features (MFCC, log-mel, deltas).
     No transformer backbone — standalone model.
     """
 
-    def __init__(self, feature_dim: int, lstm_hidden: int, lstm_layers: int, lstm_dropout: float, num_labels: int = NUM_LABELS):
+    def __init__(
+        self,
+        feature_dim: int,
+        lstm_hidden: int,
+        lstm_layers: int,
+        lstm_dropout: float,
+        mlp_hidden: list,
+        mlp_dropout: float,
+        num_labels: int = NUM_LABELS,
+    ):
         super().__init__()
         self.lstm = nn.LSTM(
             feature_dim, lstm_hidden, num_layers=lstm_layers,
             batch_first=True, bidirectional=True,
             dropout=lstm_dropout if lstm_layers > 1 else 0.0,
         )
-        self.classifier = nn.Linear(lstm_hidden * 2, num_labels)
+        self.classifier = _build_mlp(lstm_hidden * 2, mlp_hidden, mlp_dropout, num_labels)
 
     def forward(self, features: torch.Tensor, attention_mask: torch.Tensor | None = None, **kwargs):
-        # features: (B, T, feature_dim)
         lstm_out, _ = self.lstm(features)  # (B, T, 2*lstm_hidden)
 
         if attention_mask is None:
@@ -273,7 +292,11 @@ def build_model(config: ExperimentConfig) -> nn.Module:
 
     elif strategy == "lstm_features":
         feature_dim = _lstm_feature_dim(config)
-        model = LSTMFeaturesModel(feature_dim, config.lstm_hidden, config.lstm_layers, config.lstm_dropout, config.num_labels)
+        model = LSTMFeaturesModel(
+            feature_dim, config.lstm_hidden, config.lstm_layers, config.lstm_dropout,
+            getattr(config, "mlp_hidden", [256]), getattr(config, "mlp_dropout", 0.3),
+            config.num_labels,
+        )
         return model  # no backbone needed
 
     elif strategy == "fusion":

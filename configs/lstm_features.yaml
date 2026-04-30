@@ -2,11 +2,13 @@ fine_tune_strategy: lstm_features
 feature_type: mfcc_logmel   # mfcc | mfcc_delta | logmel | mfcc_logmel | combined
 n_mfcc: 60
 n_mels: 100
-n_fft: 400
+n_fft: 1024
 hop_length: 120
 lstm_hidden: 512
 lstm_layers: 1
 lstm_dropout: 0.3
+mlp_hidden: [256, 128]
+mlp_dropout: 0.3
 batch_size: 32
 grad_accum_steps: 1
 lr: 1.0e-3
