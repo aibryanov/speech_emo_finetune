@@ -10,16 +10,17 @@ import logging
 import random
 import warnings
 
-import numpy as np
-import torch
-
-from src.config import load_config
-from src.dataset import get_dataloaders, get_feature_dataloaders, get_fusion_dataloaders
-from src.models import build_model
-from src.trainer import Trainer
-
 warnings.filterwarnings("ignore")
 logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("torchaudio").setLevel(logging.ERROR)
+
+import numpy as np  # noqa: E402
+import torch  # noqa: E402
+
+from src.config import load_config  # noqa: E402
+from src.dataset import get_dataloaders, get_feature_dataloaders, get_fusion_dataloaders  # noqa: E402
+from src.models import build_model  # noqa: E402
+from src.trainer import Trainer  # noqa: E402
 
 
 def set_seed(seed: int):
