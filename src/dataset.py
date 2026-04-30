@@ -191,6 +191,11 @@ def _extract_features(waveform: torch.Tensor, config: ExperimentConfig) -> torch
     elif config.feature_type == "logmel":
         feat = db_transform(mel_transform(x)).squeeze(0)  # (n_mels, T_frames)
 
+    elif config.feature_type == "mfcc_logmel":
+        mfcc = mfcc_transform(x).squeeze(0)
+        logmel = db_transform(mel_transform(x)).squeeze(0)
+        feat = torch.cat([mfcc, logmel], dim=0)  # (n_mfcc+n_mels, T_frames)
+
     else:  # combined: mfcc_delta + logmel
         mfcc = mfcc_transform(x).squeeze(0)
         delta = torchaudio.functional.compute_deltas(mfcc)

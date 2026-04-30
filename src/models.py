@@ -165,7 +165,9 @@ def _lstm_feature_dim(config) -> int:
         return config.n_mfcc * 3
     elif config.feature_type == "logmel":
         return config.n_mels
-    else:  # combined
+    elif config.feature_type == "mfcc_logmel":
+        return config.n_mfcc + config.n_mels
+    else:  # combined: mfcc_delta + logmel
         return config.n_mfcc * 3 + config.n_mels
 
 
