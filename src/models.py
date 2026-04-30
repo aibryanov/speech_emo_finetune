@@ -292,6 +292,12 @@ def build_model(config: ExperimentConfig) -> nn.Module:
         )
         lstm_ckpt = getattr(config, "lstm_pretrained", "")
         if lstm_ckpt:
+            from pathlib import Path as _Path
+            if not _Path(lstm_ckpt).exists():
+                raise FileNotFoundError(
+                    f"lstm_pretrained not found: {lstm_ckpt}\n"
+                    "Run stage 1 first: python train.py configs/lstm_features.yaml"
+                )
             ckpt = torch.load(lstm_ckpt, map_location="cpu", weights_only=False)
             lstm_state = {
                 k[len("lstm."):]: v
