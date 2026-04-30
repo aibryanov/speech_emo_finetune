@@ -74,6 +74,7 @@ class ExperimentConfig:
     # --- fusion model ---
     fusion_hidden: int = 512
     fusion_dropout: float = 0.3
+    lstm_pretrained: str = ""  # path to pre-trained LSTMFeaturesModel checkpoint
 
     # --- misc ---
     merge_labels: bool = False  # merge 7 classes → 4 (positive/negative/neutral/other)

@@ -290,6 +290,17 @@ def build_model(config: ExperimentConfig) -> nn.Module:
             fusion_dropout=config.fusion_dropout,
             num_labels=config.num_labels,
         )
+        lstm_ckpt = getattr(config, "lstm_pretrained", "")
+        if lstm_ckpt:
+            ckpt = torch.load(lstm_ckpt, map_location="cpu", weights_only=False)
+            lstm_state = {
+                k[len("lstm."):]: v
+                for k, v in ckpt["model_state_dict"].items()
+                if k.startswith("lstm.")
+            }
+            model.lstm.load_state_dict(lstm_state)
+            _freeze_all(model.lstm)
+            print(f"Loaded pre-trained BiLSTM from {lstm_ckpt} (frozen)")
 
     else:
         raise ValueError(f"Unknown fine_tune_strategy: {strategy!r}")

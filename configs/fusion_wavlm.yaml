@@ -1,3 +1,7 @@
+# Stage 1: train BiLSTM standalone
+#   python train.py configs/lstm_features.yaml
+# Stage 2: freeze BiLSTM, train fusion MLP
+#   set lstm_pretrained below, then run this config
 model_name: Aniemore/wavlm-emotion-russian-resd
 processor_name: microsoft/wavlm-base
 fine_tune_strategy: fusion
@@ -22,5 +26,8 @@ epochs: 30
 weight_decay: 0.01
 scheduler_type: cosine
 warmup_ratio: 0.05
+# path to pre-trained BiLSTM checkpoint (from lstm_features run)
+# leave empty to train BiLSTM from scratch jointly with MLP
+lstm_pretrained: outputs/lstm_features/best_model.pt
 run_name: fusion_wavlm
 output_dir: outputs/fusion_wavlm
