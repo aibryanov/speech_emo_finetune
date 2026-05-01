@@ -163,15 +163,16 @@ class Trainer:
         return self.model.module if isinstance(self.model, nn.DataParallel) else self.model
 
     def save_checkpoint(self, path: Path, epoch: int):
-        ckpt = {
-            "model_state_dict": self._unwrapped().state_dict(),
-            "epoch": epoch,
-            "best_metric": self.best_metric,
-        }
-        if self.config.fine_tune_strategy != "full":
-            ckpt["optimizer_state_dict"] = self.optimizer.state_dict()
-            ckpt["scheduler_state_dict"] = self.scheduler.state_dict()
-        torch.save(ckpt, path)
+        import dataclasses
+        torch.save({
+            "model_state_dict":     self._unwrapped().state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "scheduler_state_dict": self.scheduler.state_dict(),
+            "scaler_state_dict":    self.scaler.state_dict() if self.scaler else None,
+            "epoch":                epoch,
+            "best_metric":          self.best_metric,
+            "config":               dataclasses.asdict(self.config),
+        }, path)
 
     def load_checkpoint(self, path: Path) -> int:
         """Load full checkpoint. Returns the next epoch index to start from."""
@@ -181,6 +182,8 @@ class Trainer:
             self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
         if "scheduler_state_dict" in ckpt:
             self.scheduler.load_state_dict(ckpt["scheduler_state_dict"])
+        if self.scaler and ckpt.get("scaler_state_dict"):
+            self.scaler.load_state_dict(ckpt["scaler_state_dict"])
         if "best_metric" in ckpt:
             self.best_metric = ckpt["best_metric"]
         return ckpt.get("epoch", 0)
