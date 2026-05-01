@@ -16,6 +16,7 @@ epochs: 10
 weight_decay: 0.01
 warmup_ratio: 0.05
 scheduler_type: cosine
+fp16: true
 
 run_name: wavlm_base_dusha_full
 output_dir: outputs/wavlm_base_dusha_full
