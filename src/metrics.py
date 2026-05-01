@@ -11,13 +11,24 @@ from sklearn.metrics import (
     f1_score,
 )
 
-from src.dataset import ID2LABEL, MERGED_ID2LABEL, NUM_LABELS, NUM_MERGED_LABELS
+from src.dataset import (
+    ID2LABEL, MERGED_ID2LABEL, DUSHA_ID2LABEL,
+    NUM_LABELS, NUM_MERGED_LABELS, NUM_DUSHA_LABELS,
+)
 
 
-def compute_metrics(preds: np.ndarray, labels: np.ndarray, merge_labels: bool = False) -> Dict:
+def compute_metrics(
+    preds: np.ndarray,
+    labels: np.ndarray,
+    merge_labels: bool = False,
+    num_labels: int | None = None,
+) -> Dict:
     if merge_labels:
         id2label = MERGED_ID2LABEL
         n = NUM_MERGED_LABELS
+    elif num_labels == NUM_DUSHA_LABELS:
+        id2label = DUSHA_ID2LABEL
+        n = NUM_DUSHA_LABELS
     else:
         id2label = ID2LABEL
         n = NUM_LABELS

@@ -1,0 +1,21 @@
+model_name: xbgoose/wavlm-base-speech-emotion-recognition-russian-dusha-finetuned
+processor_name: microsoft/wavlm-base
+fine_tune_strategy: full
+num_labels: 5
+
+# --- Dusha paths (set before running) ---
+# aggregated_tsv: pick one of the outputs from aggregate_labels.ipynb
+aggregated_tsv: /kaggle/input/dusha-aggregated/aggregated_ds_0.9.tsv
+audio_dir: /kaggle/input/dusha-datasetcrowd
+
+# --- training ---
+batch_size: 4
+grad_accum_steps: 8
+lr: 2.0e-5
+epochs: 10
+weight_decay: 0.01
+warmup_ratio: 0.05
+scheduler_type: cosine
+
+run_name: wavlm_base_dusha_full
+output_dir: outputs/wavlm_base_dusha_full

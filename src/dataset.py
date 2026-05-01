@@ -453,3 +453,109 @@ def get_dataloaders(
         pin_memory=True,
     )
     return train_loader, dev_loader, test_loader
+
+
+# ---------------------------------------------------------------------------
+# Dusha dataset (from aggregated TSV + local audio files)
+# ---------------------------------------------------------------------------
+
+DUSHA_LABEL2ID: Dict[str, int] = {
+    "neutral":  0,
+    "angry":    1,
+    "positive": 2,
+    "sad":      3,
+    "other":    4,
+}
+DUSHA_ID2LABEL: Dict[int, str] = {v: k for k, v in DUSHA_LABEL2ID.items()}
+NUM_DUSHA_LABELS = len(DUSHA_LABEL2ID)
+
+
+class DushaDataset(Dataset):
+    """Dataset for Dusha crowd-annotated data loaded from an aggregated TSV."""
+
+    def __init__(
+        self,
+        records: list,           # list of dicts with 'audio_path' and 'aggregated_emo'
+        audio_dir: str,
+        processor: AutoFeatureExtractor,
+        max_len_samples: int,
+        config: ExperimentConfig,
+        training: bool = False,
+    ):
+        self.records = records
+        self.audio_dir = audio_dir.rstrip("/")
+        self.processor = processor
+        self.max_len_samples = max_len_samples
+        self.config = config
+        self.training = training
+
+    def __len__(self) -> int:
+        return len(self.records)
+
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+        rec = self.records[idx]
+        audio_path = f"{self.audio_dir}/{rec['audio_path']}"
+
+        waveform, sr = torchaudio.load(audio_path)
+        if waveform.shape[0] > 1:
+            waveform = waveform.mean(dim=0)
+        else:
+            waveform = waveform.squeeze(0)
+
+        if sr != SAMPLE_RATE:
+            waveform = F.resample(waveform, sr, SAMPLE_RATE)
+
+        waveform = waveform[: self.max_len_samples]
+
+        if self.training and getattr(self.config, "augment", False):
+            waveform = _augment_waveform(waveform, self.config)
+
+        inputs = self.processor(
+            waveform.numpy(), sampling_rate=SAMPLE_RATE, return_tensors="pt"
+        )
+        input_values = inputs["input_values"].squeeze(0)
+        label = torch.tensor(DUSHA_LABEL2ID[rec["aggregated_emo"]], dtype=torch.long)
+        return {"input_values": input_values, "label": label}
+
+
+def _dusha_stratified_split(records: list, dev_ratio: float, seed: int):
+    import numpy as np
+    labels = [DUSHA_LABEL2ID[r["aggregated_emo"]] for r in records]
+    indices = np.arange(len(records))
+    sss = StratifiedShuffleSplit(n_splits=1, test_size=dev_ratio, random_state=seed)
+    train_idx, dev_idx = next(sss.split(indices, labels))
+    return [records[i] for i in train_idx], [records[i] for i in dev_idx]
+
+
+def get_dusha_dataloaders(
+    config: ExperimentConfig,
+    processor: AutoFeatureExtractor,
+) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    import pandas as pd
+
+    tsv_path = getattr(config, "aggregated_tsv", "")
+    audio_dir = getattr(config, "audio_dir", "")
+    if not tsv_path or not audio_dir:
+        raise ValueError("aggregated_tsv and audio_dir must be set in config for Dusha")
+
+    df = pd.read_csv(tsv_path, sep="\t")
+    records = df[["audio_path", "aggregated_emo"]].to_dict("records")
+
+    train_records, dev_records = _dusha_stratified_split(records, config.dev_ratio, config.seed)
+
+    max_len = int(config.max_audio_len_s * SAMPLE_RATE)
+    _collate = partial(collate_fn, max_len_samples=max_len)
+
+    train_ds = DushaDataset(train_records, audio_dir, processor, max_len, config, training=True)
+    dev_ds   = DushaDataset(dev_records,   audio_dir, processor, max_len, config, training=False)
+
+    train_loader = DataLoader(
+        train_ds, batch_size=config.batch_size, shuffle=True,
+        num_workers=config.num_workers, collate_fn=_collate, pin_memory=True,
+    )
+    dev_loader = DataLoader(
+        dev_ds, batch_size=config.batch_size * 2, shuffle=False,
+        num_workers=config.num_workers, collate_fn=_collate, pin_memory=True,
+    )
+    # no separate test split — dev is used for evaluation
+    return train_loader, dev_loader, dev_loader

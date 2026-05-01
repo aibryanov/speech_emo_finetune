@@ -80,6 +80,10 @@ class ExperimentConfig:
     fusion_dropout: float = 0.3
     lstm_pretrained: str = ""  # path to pre-trained LSTMFeaturesModel checkpoint
 
+    # --- Dusha dataset ---
+    aggregated_tsv: str = ""   # path to aggregated TSV (Dawid-Skene or majority)
+    audio_dir: str = ""        # root directory containing audio files
+
     # --- misc ---
     merge_labels: bool = False  # merge 7 classes → 4 (positive/negative/neutral/other)
     num_labels: int = 7

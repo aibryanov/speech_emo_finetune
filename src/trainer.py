@@ -133,7 +133,11 @@ class Trainer:
 
         all_preds = torch.cat(all_preds).numpy()
         all_labels = torch.cat(all_labels).numpy()
-        return compute_metrics(all_preds, all_labels, merge_labels=getattr(self.config, "merge_labels", False))
+        return compute_metrics(
+            all_preds, all_labels,
+            merge_labels=getattr(self.config, "merge_labels", False),
+            num_labels=self.config.num_labels,
+        )
 
     # ------------------------------------------------------------------
     def _log(self, record: Dict):
