@@ -559,3 +559,23 @@ def get_dusha_dataloaders(
     )
     # no separate test split — dev is used for evaluation
     return train_loader, dev_loader, dev_loader
+
+
+def get_dusha_test_dataloader(
+    tsv_path: str,
+    audio_dir: str,
+    processor: AutoFeatureExtractor,
+    config: ExperimentConfig,
+) -> DataLoader:
+    """Load an entire aggregated TSV as a test set (no train/dev split)."""
+    import pandas as pd
+    df = pd.read_csv(tsv_path, sep="\t")
+    records = df[["audio_path", "aggregated_emo"]].to_dict("records")
+    max_len = int(config.max_audio_len_s * SAMPLE_RATE)
+    ds = DushaDataset(records, audio_dir, processor, max_len, config, training=False)
+    return DataLoader(
+        ds, batch_size=config.batch_size * 2, shuffle=False,
+        num_workers=config.num_workers,
+        collate_fn=partial(collate_fn, max_len_samples=max_len),
+        pin_memory=True,
+    )
