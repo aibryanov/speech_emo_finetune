@@ -145,19 +145,25 @@ class Trainer:
         with open(self.output_dir / "metrics.jsonl", "a") as f:
             f.write(json.dumps(record) + "\n")
 
+    def _unwrapped(self) -> nn.Module:
+        """Return the model without DataParallel wrapper if present."""
+        return self.model.module if isinstance(self.model, nn.DataParallel) else self.model
+
     def save_checkpoint(self, path: Path, epoch: int):
-        torch.save({
-            "model_state_dict": self.model.state_dict(),
-            "optimizer_state_dict": self.optimizer.state_dict(),
-            "scheduler_state_dict": self.scheduler.state_dict(),
+        ckpt = {
+            "model_state_dict": self._unwrapped().state_dict(),
             "epoch": epoch,
             "best_metric": self.best_metric,
-        }, path)
+        }
+        if self.config.fine_tune_strategy != "full":
+            ckpt["optimizer_state_dict"] = self.optimizer.state_dict()
+            ckpt["scheduler_state_dict"] = self.scheduler.state_dict()
+        torch.save(ckpt, path)
 
     def load_checkpoint(self, path: Path) -> int:
         """Load full checkpoint. Returns the next epoch index to start from."""
         ckpt = torch.load(path, map_location=self.device, weights_only=False)
-        self.model.load_state_dict(ckpt["model_state_dict"])
+        self._unwrapped().load_state_dict(ckpt["model_state_dict"])
         if "optimizer_state_dict" in ckpt:
             self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
         if "scheduler_state_dict" in ckpt:
@@ -168,7 +174,7 @@ class Trainer:
 
     def _load_best_model(self, path: Path):
         ckpt = torch.load(path, map_location=self.device, weights_only=False)
-        self.model.load_state_dict(ckpt["model_state_dict"])
+        self._unwrapped().load_state_dict(ckpt["model_state_dict"])
 
     # ------------------------------------------------------------------
     def fit(self, checkpoint_callback=None):
