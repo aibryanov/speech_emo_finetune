@@ -18,6 +18,7 @@ grad_accum_steps: 4
 lr: 1.0e-4
 head_lr: 5.0e-3
 epochs: 2
+fp16: true
 weight_decay: 0.01
 warmup_ratio: 0.05
 scheduler_type: cosine

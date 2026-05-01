@@ -86,6 +86,8 @@ class Trainer:
             self.criterion = nn.CrossEntropyLoss(label_smoothing=getattr(config, "label_smoothing", 0.0))
         self.best_metric = -1.0
         self.metrics_log: list = []
+        self.fp16 = getattr(config, "fp16", False) and torch.cuda.is_available()
+        self.scaler = torch.cuda.amp.GradScaler() if self.fp16 else None
 
     # ------------------------------------------------------------------
     def train_epoch(self, epoch: int) -> float:
@@ -99,13 +101,24 @@ class Trainer:
             labels = batch["labels"].to(self.device)
             inputs = {k: v.to(self.device) for k, v in batch.items() if k != "labels"}
 
-            logits = self.model(**inputs)
-            loss = self.criterion(logits, labels) / self.config.grad_accum_steps
-            loss.backward()
+            with torch.cuda.amp.autocast(enabled=self.fp16):
+                logits = self.model(**inputs)
+                loss = self.criterion(logits, labels) / self.config.grad_accum_steps
+
+            if self.fp16:
+                self.scaler.scale(loss).backward()
+            else:
+                loss.backward()
 
             if (i + 1) % self.config.grad_accum_steps == 0 or (i + 1) == len(self.train_loader):
-                nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
-                self.optimizer.step()
+                if self.fp16:
+                    self.scaler.unscale_(self.optimizer)
+                    nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+                else:
+                    nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+                    self.optimizer.step()
                 self.scheduler.step()
                 self.optimizer.zero_grad()
                 steps += 1
