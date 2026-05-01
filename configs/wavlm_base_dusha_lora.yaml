@@ -1,0 +1,26 @@
+model_name: xbgoose/wavlm-base-speech-emotion-recognition-russian-dusha-finetuned
+processor_name: microsoft/wavlm-base
+fine_tune_strategy: lora
+num_labels: 5
+
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.05
+lora_target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - out_proj
+
+# --- training ---
+batch_size: 8
+grad_accum_steps: 4
+lr: 1.0e-4
+head_lr: 5.0e-3
+epochs: 15
+weight_decay: 0.01
+warmup_ratio: 0.05
+scheduler_type: cosine
+
+run_name: wavlm_base_dusha_lora
+output_dir: outputs/wavlm_base_dusha_lora
