@@ -59,7 +59,9 @@ class ExperimentConfig:
     use_spec_augment: bool = False
 
     # --- data ---
+    train_ratio: float = 0.0  # if > 0, use only this fraction of data for train (rest discarded)
     dev_ratio: float = 0.15
+    eval_every_n_steps: int = 0  # if > 0, eval every N optimizer steps instead of every epoch
     seed: int = 42
     max_audio_len_s: float = 10.0
     num_workers: int = 2

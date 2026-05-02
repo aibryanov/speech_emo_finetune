@@ -518,10 +518,21 @@ class DushaDataset(Dataset):
         return {"input_values": input_values, "label": label}
 
 
-def _dusha_stratified_split(records: list, dev_ratio: float, seed: int):
+def _dusha_stratified_split(records: list, dev_ratio: float, seed: int, train_ratio: float = 0.0):
     import numpy as np
     labels = [DUSHA_LABEL2ID[r["aggregated_emo"]] for r in records]
     indices = np.arange(len(records))
+    if train_ratio > 0.0:
+        # Keep only train_ratio + dev_ratio of all data (rest discarded)
+        keep = train_ratio + dev_ratio
+        sss1 = StratifiedShuffleSplit(n_splits=1, test_size=keep, random_state=seed)
+        _, keep_idx = next(sss1.split(indices, labels))
+        keep_labels = [labels[i] for i in keep_idx]
+        keep_arr = np.arange(len(keep_idx))
+        dev_frac = dev_ratio / keep
+        sss2 = StratifiedShuffleSplit(n_splits=1, test_size=dev_frac, random_state=seed + 1)
+        train_in, dev_in = next(sss2.split(keep_arr, keep_labels))
+        return [records[keep_idx[i]] for i in train_in], [records[keep_idx[i]] for i in dev_in]
     sss = StratifiedShuffleSplit(n_splits=1, test_size=dev_ratio, random_state=seed)
     train_idx, dev_idx = next(sss.split(indices, labels))
     return [records[i] for i in train_idx], [records[i] for i in dev_idx]
@@ -541,7 +552,9 @@ def get_dusha_dataloaders(
     df = pd.read_csv(tsv_path, sep="\t")
     records = df[["audio_path", "aggregated_emo"]].to_dict("records")
 
-    train_records, dev_records = _dusha_stratified_split(records, config.dev_ratio, config.seed)
+    train_records, dev_records = _dusha_stratified_split(
+        records, config.dev_ratio, config.seed, getattr(config, "train_ratio", 0.0)
+    )
 
     max_len = int(config.max_audio_len_s * SAMPLE_RATE)
     _collate = partial(collate_fn, max_len_samples=max_len)

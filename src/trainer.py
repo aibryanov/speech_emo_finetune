@@ -88,9 +88,10 @@ class Trainer:
         self.metrics_log: list = []
         self.fp16 = getattr(config, "fp16", False) and torch.cuda.is_available()
         self.scaler = torch.cuda.amp.GradScaler() if self.fp16 else None
+        self._global_step = 0
 
     # ------------------------------------------------------------------
-    def train_epoch(self, epoch: int) -> float:
+    def train_epoch(self, epoch: int, step_callback=None) -> float:
         self.model.train()
         total_loss = 0.0
         steps = 0
@@ -122,6 +123,9 @@ class Trainer:
                 self.scheduler.step()
                 self.optimizer.zero_grad()
                 steps += 1
+                self._global_step += 1
+                if step_callback is not None:
+                    step_callback(self._global_step)
 
             total_loss += loss.item() * self.config.grad_accum_steps
             pbar.set_postfix(loss=f"{loss.item() * self.config.grad_accum_steps:.4f}")
@@ -193,9 +197,37 @@ class Trainer:
         self._unwrapped().load_state_dict(ckpt["model_state_dict"])
 
     # ------------------------------------------------------------------
+    def _eval_and_log(self, step_or_epoch, best_ckpt: Path, is_step: bool) -> Dict:
+        dev_metrics = self.eval_epoch(self.dev_loader, "dev")
+        current_lr = self.optimizer.param_groups[0]["lr"]
+        is_best = dev_metrics["f1_weighted"] > self.best_metric
+        if is_best:
+            self.best_metric = dev_metrics["f1_weighted"]
+            self.save_checkpoint(best_ckpt, step_or_epoch)
+        key = "step" if is_step else "epoch"
+        record = {
+            key: step_or_epoch,
+            "dev_accuracy": round(dev_metrics["accuracy"], 4),
+            "dev_weighted_accuracy": round(dev_metrics["weighted_accuracy"], 4),
+            "dev_f1_macro": round(dev_metrics["f1_macro"], 4),
+            "dev_f1_weighted": round(dev_metrics["f1_weighted"], 4),
+            "lr": current_lr,
+        }
+        self._log(record)
+        label = f"step {step_or_epoch}" if is_step else f"epoch {step_or_epoch}"
+        print(
+            f"  [{label}]  lr={current_lr:.2e}  "
+            f"acc={dev_metrics['accuracy']:.4f}  wacc={dev_metrics['weighted_accuracy']:.4f}  "
+            f"f1mac={dev_metrics['f1_macro']:.4f}  f1w={dev_metrics['f1_weighted']:.4f}"
+            f"  {'*' if is_best else ''}",
+            flush=True,
+        )
+        return dev_metrics
+
     def fit(self, checkpoint_callback=None):
         best_ckpt = self.output_dir / "best_model.pt"
         save_every = getattr(self.config, "save_every_n_epochs", 5)
+        eval_every = getattr(self.config, "eval_every_n_steps", 0)
 
         start_epoch = 0
         resume_from = getattr(self.config, "resume_from", "")
@@ -203,39 +235,44 @@ class Trainer:
             start_epoch = self.load_checkpoint(Path(resume_from))
             print(f"Resumed from {resume_from} — starting at epoch {start_epoch + 1}", flush=True)
 
-        header = f"{'Epoch':>5}  {'Loss':>7}  {'LR':>8}  {'Tr.Acc':>6}  {'Tr.F1w':>6}  {'Acc':>6}  {'WAcc':>6}  {'F1mac':>6}  {'F1w':>6}  {'Time':>6}  {'Best':>4}"
-        sep = "-" * len(header)
         print(f"\nRun: {self.config.run_name}  |  strategy: {self.config.fine_tune_strategy}  |  model: {self.config.model_name}", flush=True)
-        print(sep, flush=True)
-        print(header, flush=True)
-        print(sep, flush=True)
+
+        step_callback = None
+        if eval_every > 0:
+            def step_callback(step: int):
+                if step % eval_every == 0:
+                    self._eval_and_log(step, best_ckpt, is_step=True)
 
         for epoch in range(start_epoch, self.config.epochs):
             t0 = time.time()
-            train_loss = self.train_epoch(epoch)
-            train_metrics = self.eval_epoch(self.train_loader, "train")
-            dev_metrics = self.eval_epoch(self.dev_loader, "dev")
+            train_loss = self.train_epoch(epoch, step_callback=step_callback)
             elapsed = time.time() - t0
 
-            record = {
-                "epoch": epoch + 1,
-                "train_loss": round(train_loss, 4),
-                "train_accuracy": round(train_metrics["accuracy"], 4),
-                "train_f1_weighted": round(train_metrics["f1_weighted"], 4),
-                "dev_accuracy": round(dev_metrics["accuracy"], 4),
-                "dev_weighted_accuracy": round(dev_metrics["weighted_accuracy"], 4),
-                "dev_f1_macro": round(dev_metrics["f1_macro"], 4),
-                "dev_f1_weighted": round(dev_metrics["f1_weighted"], 4),
-                "elapsed_s": round(elapsed, 1),
-            }
-            self._log(record)
-
             current_lr = self.optimizer.param_groups[0]["lr"]
+            print(f"Epoch {epoch+1}  loss={train_loss:.4f}  lr={current_lr:.2e}  {elapsed:.0f}s", flush=True)
 
-            is_best = dev_metrics["f1_weighted"] > self.best_metric
-            if is_best:
-                self.best_metric = dev_metrics["f1_weighted"]
-                self.save_checkpoint(best_ckpt, epoch + 1)
+            if eval_every == 0:
+                dev_metrics = self.eval_epoch(self.dev_loader, "dev")
+                is_best = dev_metrics["f1_weighted"] > self.best_metric
+                if is_best:
+                    self.best_metric = dev_metrics["f1_weighted"]
+                    self.save_checkpoint(best_ckpt, epoch + 1)
+                record = {
+                    "epoch": epoch + 1,
+                    "train_loss": round(train_loss, 4),
+                    "dev_accuracy": round(dev_metrics["accuracy"], 4),
+                    "dev_weighted_accuracy": round(dev_metrics["weighted_accuracy"], 4),
+                    "dev_f1_macro": round(dev_metrics["f1_macro"], 4),
+                    "dev_f1_weighted": round(dev_metrics["f1_weighted"], 4),
+                    "elapsed_s": round(elapsed, 1),
+                }
+                self._log(record)
+                print(
+                    f"  acc={dev_metrics['accuracy']:.4f}  wacc={dev_metrics['weighted_accuracy']:.4f}  "
+                    f"f1mac={dev_metrics['f1_macro']:.4f}  f1w={dev_metrics['f1_weighted']:.4f}"
+                    f"  {'*' if is_best else ''}",
+                    flush=True,
+                )
 
             is_periodic = save_every > 0 and (epoch + 1) % save_every == 0
             is_first = (epoch + 1 == start_epoch + 1)
@@ -245,15 +282,7 @@ class Trainer:
                 if checkpoint_callback is not None:
                     checkpoint_callback(periodic_ckpt)
 
-            print(
-                f"{epoch+1:>5}  {train_loss:>7.4f}  {current_lr:>8.2e}  "
-                f"{train_metrics['accuracy']:>6.4f}  {train_metrics['f1_weighted']:>6.4f}  "
-                f"{dev_metrics['accuracy']:>6.4f}  {dev_metrics['weighted_accuracy']:>6.4f}  "
-                f"{dev_metrics['f1_macro']:>6.4f}  {dev_metrics['f1_weighted']:>6.4f}  "
-                f"{elapsed:>5.0f}s  {'*' if is_best else ''}",
-                flush=True,
-            )
-
+        sep = "-" * 60
         print(sep, flush=True)
 
         # final evaluation on test set using best checkpoint

@@ -11,7 +11,9 @@ aug_noise_std: 0.005
 aug_time_mask_ratio: 0.1
 aug_amplitude_range: [0.8, 1.2]
 use_spec_augment: false
+train_ratio: 0.0
 dev_ratio: 0.15
+eval_every_n_steps: 0
 seed: 42
 max_audio_len_s: 10.0
 num_workers: 2
