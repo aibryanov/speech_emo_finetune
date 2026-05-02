@@ -522,6 +522,13 @@ def _dusha_stratified_split(records: list, dev_ratio: float, seed: int, train_ra
     import numpy as np
     labels = [DUSHA_LABEL2ID[r["aggregated_emo"]] for r in records]
     indices = np.arange(len(records))
+    if dev_ratio == 0.0:
+        # No dev split — just sample train_ratio fraction (or all if train_ratio=0)
+        if train_ratio > 0.0:
+            sss = StratifiedShuffleSplit(n_splits=1, test_size=train_ratio, random_state=seed)
+            _, train_idx = next(sss.split(indices, labels))
+            return [records[i] for i in train_idx], []
+        return records, []
     if train_ratio > 0.0:
         # Keep only train_ratio + dev_ratio of all data (rest discarded)
         keep = train_ratio + dev_ratio
@@ -560,17 +567,18 @@ def get_dusha_dataloaders(
     _collate = partial(collate_fn, max_len_samples=max_len)
 
     train_ds = DushaDataset(train_records, audio_dir, processor, max_len, config, training=True)
-    dev_ds   = DushaDataset(dev_records,   audio_dir, processor, max_len, config, training=False)
-
     train_loader = DataLoader(
         train_ds, batch_size=config.batch_size, shuffle=True,
         num_workers=config.num_workers, collate_fn=_collate, pin_memory=True,
     )
-    dev_loader = DataLoader(
-        dev_ds, batch_size=config.batch_size * 2, shuffle=False,
-        num_workers=config.num_workers, collate_fn=_collate, pin_memory=True,
-    )
-    # no separate test split — dev is used for evaluation
+
+    dev_loader = None
+    if dev_records:
+        dev_ds = DushaDataset(dev_records, audio_dir, processor, max_len, config, training=False)
+        dev_loader = DataLoader(
+            dev_ds, batch_size=config.batch_size * 2, shuffle=False,
+            num_workers=config.num_workers, collate_fn=_collate, pin_memory=True,
+        )
     return train_loader, dev_loader, dev_loader
 
 

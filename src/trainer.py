@@ -237,8 +237,10 @@ class Trainer:
 
         print(f"\nRun: {self.config.run_name}  |  strategy: {self.config.fine_tune_strategy}  |  model: {self.config.model_name}", flush=True)
 
+        has_dev = self.dev_loader is not None
+
         step_callback = None
-        if eval_every > 0:
+        if eval_every > 0 and has_dev:
             def step_callback(step: int):
                 if step % eval_every == 0:
                     self._eval_and_log(step, best_ckpt, is_step=True)
@@ -251,7 +253,7 @@ class Trainer:
             current_lr = self.optimizer.param_groups[0]["lr"]
             print(f"Epoch {epoch+1}  loss={train_loss:.4f}  lr={current_lr:.2e}  {elapsed:.0f}s", flush=True)
 
-            if eval_every == 0:
+            if eval_every == 0 and has_dev:
                 dev_metrics = self.eval_epoch(self.dev_loader, "dev")
                 is_best = dev_metrics["f1_weighted"] > self.best_metric
                 if is_best:
@@ -284,6 +286,12 @@ class Trainer:
 
         sep = "-" * 60
         print(sep, flush=True)
+
+        if not has_dev:
+            self.save_checkpoint(best_ckpt, self.config.epochs)
+            print(f"\nFinal model saved → {best_ckpt}", flush=True)
+            self._save_adapter()
+            return {}
 
         # final evaluation on test set using best checkpoint
         print(f"\nLoading best checkpoint (f1_weighted={self.best_metric:.4f})...", flush=True)
