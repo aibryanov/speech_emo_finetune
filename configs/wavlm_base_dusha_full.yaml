@@ -9,7 +9,7 @@ aggregated_tsv: /kaggle/input/dusha-aggregated/aggregated_ds_0.9.tsv
 audio_dir: /kaggle/input/dusha-datasetcrowd
 
 # --- training ---
-train_ratio: 0.35
+train_ratio: 0.7
 dev_ratio: 0.0
 eval_every_n_steps: 0
 
