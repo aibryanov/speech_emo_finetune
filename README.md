@@ -47,7 +47,6 @@
 | `dgca_resd_kaggle.ipynb` | То же на RESD (+ Whisper для транскрипции, т.к. текста в RESD нет) |
 | `dgca_fusion_kaggle.ipynb` | Более ранняя версия DGCA (бэкбоны дообучаются, не заморожены) |
 | `infer_dgca_resd_kaggle.ipynb` | Инференс/оценка уже обученной DGCA-модели на RESD |
-| `alpha_analysis_dusha_kaggle.ipynb` / `alpha_analysis_resd_kaggle.ipynb` | Анализ гейтинг-весов α — когда модель доверяет тексту, а когда аудио |
 
 **Fusion аудио-only (без текста, не DGCA)**
 | Ноутбук | Что делает |
