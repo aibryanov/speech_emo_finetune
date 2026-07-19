@@ -1,186 +1,75 @@
-# Speech Emotion Fine-Tuning on RESD
+# Speech Emotion Recognition: DUSHA + RESD
 
-Research project comparing fine-tuning strategies and backbone architectures for **Russian speech emotion recognition** on the [RESD dataset](https://huggingface.co/datasets/Aniemore/resd).
+Код к ВКР «Классификация эмоциональной окраски речи с применением нейронных сетей»
+(СПбГУ, 2026, Ибрянов А.С.). Задача — распознавание эмоций по русской речи на
+датасетах **DUSHA** (crowd, 5 классов) и **RESD** (актёрская речь, 7 классов):
+агрегация крауд-меток → классический ML → fine-tuning SSL-трансформеров →
+мультимодальный audio+text fusion.
 
-## What's being studied
+## Структура
 
-| Dimension | Options |
-|-----------|---------|
-| **Backbones** | HuBERT Large, WavLM Base, wav2vec2 XLS-R 300M |
-| **Strategies** | Head-only, LoRA, Top-N layers, Full fine-tune, BiLSTM |
-| **Dataset** | RESD — 7 emotions, ~1400 Russian speech samples |
+- `src/` — общий код: `config.py`, `dataset.py`, `models.py`, `metrics.py`, `trainer.py`
+- `configs/` — YAML-конфиги экспериментов для `train.py`
+- `train.py` — CLI для экспериментов на RESD
+- `notebooks/` — эксперименты на Kaggle/Colab (см. ниже)
 
-All backbones are pre-trained on [Dusha](https://huggingface.co/datasets/salute-developers/dusha) (5 classes). The classification head is replaced with a fresh 7-class head for RESD.
+## Ноутбуки — что где искать
 
-**RESD emotions:** happiness · sadness · anger · fear · disgust · enthusiasm · neutral
+**Данные и разметка**
+| Ноутбук | Что делает |
+|---|---|
+| `eda.ipynb` | Разведочный анализ RESD: классы, длительности, спектрограммы |
+| `aggregate_labels.ipynb` | Агрегация крауд-меток DUSHA: Majority Vote + Дэвид–Скин (пороги 0.85 / 0.9 / 0.95 / 0.98) |
 
----
+**Классический ML**
+| Ноутбук | Что делает |
+|---|---|
+| `classical_ml_kaggle.ipynb` | SVM / Random Forest / 2D ResNet на 85 признаках (MFCC, Pitch, ZCR, DWT) — отдельно на RESD и DUSHA |
 
-## Project structure
+**WavLM на DUSHA**
+| Ноутбук | Что делает |
+|---|---|
+| `bert_dusha_kaggle.ipynb` | Fine-tune ruBERT (rubert-tiny2) на текстах реплик DUSHA |
+| `dusha_smoke_test.ipynb` | Быстрый sanity-check пайплайна (1 батч, 1 эпоха) |
+| `dusha_train_kaggle.ipynb` | Full fine-tune WavLM Base на 5 вариантах агрегации DUSHA |
+| `dusha_eval_kaggle.ipynb` | Кросс-оценка 5×5: какая модель на какой разметке точнее |
 
-```
-speech_emo_finetune/
-├── configs/
-│   ├── base.yaml                  # shared defaults
-│   ├── hubert_large_head.yaml
-│   ├── hubert_large_lora.yaml
-│   ├── hubert_large_topn.yaml
-│   ├── hubert_large_lstm.yaml
-│   ├── wavlm_base_head.yaml
-│   ├── wavlm_base_lora.yaml
-│   ├── wavlm_base_full.yaml
-│   ├── wav2vec2_xlsr_head.yaml
-│   └── wav2vec2_xlsr_lora.yaml
-├── src/
-│   ├── config.py      # ExperimentConfig dataclass + YAML loader
-│   ├── dataset.py     # RESD loading, stratified split, DataLoader
-│   ├── models.py      # model factory (5 strategies)
-│   ├── metrics.py     # accuracy, F1, confusion matrix
-│   └── trainer.py     # training loop, checkpointing, JSONL logging
-├── notebooks/
-│   ├── eda.ipynb          # exploratory data analysis
-│   └── train_colab.ipynb  # self-contained Colab / Kaggle notebook
-├── train.py           # CLI entry point
-└── requirements.txt
-```
+**RESD — обучение и baseline**
+| Ноутбук | Что делает |
+|---|---|
+| `backbone_eval.ipynb` / `eval_wavlm_resd_colab.ipynb` | Оценка готовой модели `Aniemore/wavlm-emotion-russian-resd` на RESD без дообучения (baseline) |
+| `train_colab.ipynb` | Запуск экспериментов `train.py` (head_only / LoRA / top-N / full / BiLSTM) в Colab/Kaggle |
 
----
+**Fusion текст + аудио (DGCA)**
+| Ноутбук | Что делает |
+|---|---|
+| `dgca_dusha_kaggle.ipynb` | Fusion WavLM + ruBERT на DUSHA (бэкбоны заморожены) |
+| `dgca_resd_kaggle.ipynb` | То же на RESD (+ Whisper для транскрипции, т.к. текста в RESD нет) |
+| `dgca_fusion_kaggle.ipynb` | Более ранняя версия DGCA (бэкбоны дообучаются, не заморожены) |
+| `infer_dgca_resd_kaggle.ipynb` | Инференс/оценка уже обученной DGCA-модели на RESD |
+| `alpha_analysis_dusha_kaggle.ipynb` / `alpha_analysis_resd_kaggle.ipynb` | Анализ гейтинг-весов α — когда модель доверяет тексту, а когда аудио |
 
-## Setup
+**Fusion аудио-only (без текста, не DGCA)**
+| Ноутбук | Что делает |
+|---|---|
+| `fusion_colab.ipynb` | Двухэтапный fusion: backbone + BiLSTM(MFCC/mel) + статистики → MLP (через `train.py configs/lstm_features.yaml` → `fusion_wavlm.yaml`) |
+
+## Установка и запуск
 
 ```bash
 git clone https://github.com/aibryanov/speech_emo_finetune.git
 cd speech_emo_finetune
-
-python -m venv .venv
-source .venv/bin/activate
-
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-```
 
----
-
-## Running experiments
-
-```bash
-# fastest experiment (~8 min on T4)
 python train.py configs/wavlm_base_head.yaml
-
-# LoRA on HuBERT Large
-python train.py configs/hubert_large_lora.yaml
-
-# override any config value from CLI
-python train.py configs/wavlm_base_lora.yaml --override epochs=5 lr=5e-5
 ```
 
-Results are saved to the `output_dir` specified in the config:
-
-```
-outputs/wavlm_base_head/
-├── best_model.pt    # best checkpoint (by dev F1 weighted)
-└── metrics.jsonl   # per-epoch metrics + final test results
-```
+Ноутбуки самодостаточны — зависимости ставятся в первой ячейке, рассчитаны на запуск
+в Kaggle/Colab (там же лежат данные DUSHA/RESD и чекпоинты).
 
 ---
 
-## Configuration
-
-Each experiment YAML overrides values from `configs/base.yaml`.
-
-```yaml
-# configs/wavlm_base_lora.yaml
-model_name: xbgoose/wavlm-base-speech-emotion-recognition-russian-dusha-finetuned
-fine_tune_strategy: lora   # head_only | lora | top_n | full | lstm
-lora_rank: 8
-lora_alpha: 16
-lora_target_modules:
-  - q_proj
-  - v_proj
-batch_size: 8
-grad_accum_steps: 4        # effective batch = batch_size × grad_accum_steps
-lr: 1.0e-4
-epochs: 10
-run_name: wavlm_base_lora
-output_dir: outputs/wavlm_base_lora
-```
-
-**Key parameters:**
-
-| Parameter | Description |
-|-----------|-------------|
-| `fine_tune_strategy` | Which parts of the model to train |
-| `lora_rank` / `lora_alpha` | LoRA hyperparameters |
-| `top_n_layers` | Number of top encoder layers to unfreeze (for `top_n` strategy) |
-| `lstm_hidden` / `lstm_layers` | BiLSTM head size (for `lstm` strategy) |
-| `grad_accum_steps` | Gradient accumulation steps |
-| `max_audio_len_s` | Truncate audio longer than this (seconds) |
-| `dev_ratio` | Fraction of train set used for validation |
-
----
-
-## Fine-tuning strategies
-
-| Strategy | Trainable params | Notes |
-|----------|-----------------|-------|
-| `head_only` | Classifier head only | Fastest; good baseline |
-| `lora` | LoRA adapters + head | Efficient; best quality/cost trade-off |
-| `top_n` | Last N encoder layers + head | Middle ground |
-| `full` | All parameters | Best quality; needs more VRAM |
-| `lstm` | Frozen backbone + BiLSTM + head | Sequence modelling on top of features |
-
----
-
-## Metrics
-
-Each run logs to `metrics.jsonl`. Per epoch:
-- `train_loss`, `dev_accuracy`, `dev_weighted_accuracy`
-- `dev_f1_macro`, `dev_f1_weighted`
-
-Final test evaluation (best checkpoint):
-- All of the above on test split
-- Per-class precision / recall / F1
-- Confusion matrix
-
----
-
-## Notebooks
-
-**`notebooks/eda.ipynb`** — run locally to explore RESD:
-- Class distribution (train / test)
-- Duration histogram and per-class boxplot
-- Unique sample rates
-- Waveform examples per class
-- Mel spectrograms per class
-
-**`notebooks/train_colab.ipynb`** — self-contained for Colab / Kaggle:
-- Installs dependencies, clones repo, runs training
-- Plots loss / F1 curves
-- Shows confusion matrix
-- Comparison table across all completed experiments
-
----
-
-## GPU requirements
-
-Tested on **T4 (16 GB)**. Approximate training time per experiment (10 epochs):
-
-| Config | Time |
-|--------|------|
-| `wavlm_base_head` | ~8 min |
-| `wavlm_base_lora` | ~12 min |
-| `wavlm_base_full` | ~20 min |
-| `hubert_large_head` | ~15 min |
-| `hubert_large_lora` | ~25 min |
-| `hubert_large_lstm` | ~10 min |
-| `wav2vec2_xlsr_head` | ~15 min |
-| `wav2vec2_xlsr_lora` | ~25 min |
-
----
-
-## Models used
-
-| Model | Architecture | Pretrain data |
-|-------|-------------|---------------|
-| [xbgoose/hubert-large-dusha](https://huggingface.co/xbgoose/hubert-large-speech-emotion-recognition-russian-dusha-finetuned) | HuBERT Large (300M) | Dusha |
-| [xbgoose/wavlm-base-dusha](https://huggingface.co/xbgoose/wavlm-base-speech-emotion-recognition-russian-dusha-finetuned) | WavLM Base (94M) | Dusha |
-| [KELONMYOSA/wav2vec2-xls-r-300m](https://huggingface.co/KELONMYOSA/wav2vec2-xls-r-300m-emotion-ru) | wav2vec2 XLS-R (300M) | Dusha |
+Основные результаты работы: на RESD WavLM даёт Accuracy 0.81, DGCA fusion (WavLM+ruBERT) —
+0.825; на DUSHA WavLM даёт 0.85, лучшая агрегация меток — Дэвид–Скин с порогом 0.95.
+Подробности и вывод формул — в тексте ВКР.
